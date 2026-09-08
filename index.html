@@ -114,7 +114,7 @@ td.r{text-align:right}
     <div><div class="eyebrow" id="eyebrow">MOTIVSUCHE</div><h1>Wen haben wir gefragt?</h1></div>
     <div class="sp"></div>
     <button class="cta quiet" id="btnCsv">Als CSV laden</button>
-    <button class="cta quiet" id="btnExportMarkiert" style="display:none">Exposé für Aufnahmeleiter</button>
+    <button class="cta quiet" id="btnExportMarkiert">Exposé für Aufnahmeleiter (<span id="exportZahl">0</span>)</button>
     <button class="cta quiet" id="btnSync">Aktualisieren</button>
     <button class="cta quiet" id="btnNeuLoc" disabled>+ Location anlegen</button>
     <button class="cta" id="btnNeu" disabled>+ Anfrage anlegen</button>
@@ -126,7 +126,6 @@ td.r{text-align:right}
     <button class="pill" data-view="motive">Nach Motiv</button>
     <button class="pill" data-view="alle">Alle Anfragen</button>
     <button class="pill" data-view="archiv">Archiv (alle Locations)</button>
-    <button class="pill" id="btnMarkiert" style="display:none">☑ Markiert (<span id="markiertZahl">0</span>)</button>
     <div class="sp"></div>
     <select id="fProjekt" style="max-width:200px"></select>
     <input class="suche" id="suche" placeholder="Suchen">
@@ -151,18 +150,17 @@ const MOTIVE = ["Show Außengelände","Aufenthaltsraum","Schnittraum","Präsenta
 const ETAGEN = ["EG","Hochparterre","1. OG","2. OG","3. OG+"];
 const BEZIRKE = ["Charlottenburg-Wilmersdorf","Friedrichshain-Kreuzberg","Lichtenberg","Marzahn-Hellersdorf","Mitte","Neukölln","Pankow","Reinickendorf","Spandau","Steglitz-Zehlendorf","Tempelhof-Schöneberg","Treptow-Köpenick"];
 const STATUS = [
-  {id:"Recherchiert",ton:"tun",hint:"gefunden, noch nicht angefragt"},
-  {id:"Angefragt",ton:"lauf",hint:"Anfrage raus, warten auf Antwort"},
-  {id:"Rückfrage",ton:"lauf",hint:"die wollen noch etwas von uns"},
-  {id:"Besichtigung",ton:"lauf",hint:"Termin steht oder war"},
-  {id:"Möglich",ton:"gut",hint:"Zusage da, Preis bekannt"},
-  {id:"Gebucht",ton:"neon",hint:"fix"},
-  {id:"Absage",ton:"aus",hint:"erledigt"}];
+  {id:"Recherchiert",label:"Recherchiert",ton:"tun",hint:"gefunden, noch nicht angefragt"},
+  {id:"Angefragt",label:"Angefragt",ton:"lauf",hint:"Anfrage raus, warten auf Antwort"},
+  {id:"Rückfrage",label:"Rückfrage",ton:"lauf",hint:"die wollen noch etwas von uns"},
+  {id:"Besichtigung",label:"Besichtigung",ton:"lauf",hint:"Termin steht oder war"},
+  {id:"Möglich",label:"Möglich",ton:"gut",hint:"Zusage da, Preis bekannt"},
+  {id:"Gebucht",label:"Ausgesucht",ton:"neon",hint:"ausgesucht — bereit für den Aufnahmeleiter"},
+  {id:"Absage",label:"Absage",ton:"aus",hint:"erledigt"}];
 const KANAL = ["Mail","Telefon","BBFC","Vor Ort","Über Kontakt"];
 
 let locations = [], anfragen = [], wer = "", view = "tun", q = "", fMotiv = "", offen = null, stand = "";
 let fEtage = "", fQmMin = "", fQmMax = "", fBezirk = "", fProjekt = "";
-let markiert = new Set(), nurMarkiert = false;
 
 const $ = s => document.querySelector(s);
 function driveThumb(url, size){
@@ -343,7 +341,7 @@ function zeichnen(){
     ['a','MOTIVE VERSORGT', versorgt+'<span class="unit">von '+MOTIVE.length+'</span>', ohne.length?'Noch nichts für: '+ohne.slice(0,3).join(", ")+(ohne.length>3?" +"+(ohne.length-3):""):'Für jedes Motiv liegt etwas vor.'],
     ['b','ZU TUN', offeneListe(anfragen).length+'<span class="unit">Anfragen</span>', 'Nicht angefragt oder Wiedervorlage überfällig.'],
     ['c','IM GESPRÄCH', laufend.length+'<span class="unit">Anfragen</span>', 'Angefragt, in Rückfrage oder Besichtigung.'],
-    ['d','GEBUCHT', gebucht.length+'<span class="unit">fix</span>', gebucht.length?gebucht.slice(0,2).map(a=>(locOf(a)||{}).fields?.Name||a.fields.Titel).join(" · "):'Noch nichts unter Dach und Fach.'],
+    ['d','AUSGESUCHT', gebucht.length+'<span class="unit">Anfragen</span>', gebucht.length?gebucht.slice(0,2).map(a=>(locOf(a)||{}).fields?.Name||a.fields.Titel).join(" · "):'Noch nichts ausgesucht.'],
     ['','LOCATIONS GESAMT', locations.length+'<span class="unit">im Archiv</span>', stand?'Live aus Airtable, zuletzt geladen '+stand+'.':'Live aus Airtable.']
   ].map(([k,h,n,f])=>'<div class="kpi '+k+'"><h3>'+h+'</h3><div class="num">'+n+'</div><div class="foot">'+esc(f)+'</div></div>').join("");
 
@@ -356,7 +354,7 @@ function zeichnen(){
   $("#filterBadge").style.display = filterAktiv ? "flex" : "none";
   document.querySelectorAll(".pill[data-view]").forEach(b=>b.setAttribute("aria-pressed", b.dataset.view===view));
   $("#btnCsv").textContent = view==="archiv" ? "Archiv als CSV laden" : "Anfragen als CSV laden";
-  zeichnenBadgeMarkiert();
+  $("#exportZahl").textContent = anfragen.filter(a=>a.fields.Status==="Gebucht" && !a.fields["An Aufnahmeleiter gesendet"]).length;
 
   const b = $("#body");
   if(view==="tun") b.innerHTML = tun.length ? tafel(tun,true) : '<div class="board"><div class="blank">Nichts fällig.<br>Entweder ist alles nachgefasst — oder es fehlen noch Anfragen.</div></div>';
@@ -377,7 +375,6 @@ function zeichnen(){
 
 function sichtbarLocations(){
   return locations.filter(l=>{
-    if(nurMarkiert && !markiert.has(l.id)) return false;
     if(fMotiv && l.fields.Motiv !== fMotiv) return false;
     if(fEtage && l.fields.Etage !== fEtage) return false;
     if(fBezirk && l.fields.Bezirk !== fBezirk) return false;
@@ -391,9 +388,9 @@ function sichtbarLocations(){
 }
 
 function tafelLocations(list){
-  return '<div class="board"><table><thead><tr><th></th><th>Location</th><th>Motiv</th><th>Größe</th><th>Bezirk</th><th>Ansprechpartner</th><th>Erstellt am</th></tr></thead><tbody>'+
+  return '<div class="board"><table><thead><tr><th>Location</th><th>Motiv</th><th>Größe</th><th>Bezirk</th><th>Ansprechpartner</th><th>Erstellt am</th></tr></thead><tbody>'+
     list.map(l=>{
-      return '<tr data-locid="'+l.id+'"><td><input type="checkbox" data-mark="'+l.id+'"'+(markiert.has(l.id)?' checked':'')+' style="width:16px;height:16px;cursor:pointer"></td><td><div class="name"><div class="stripe neon"></div><div><b>'+esc(l.fields.Name||"ohne Namen")+'</b>'+
+      return '<tr data-locid="'+l.id+'"><td><div class="name"><div class="stripe neon"></div><div><b>'+esc(l.fields.Name||"ohne Namen")+'</b>'+
         '<span>'+esc((l.fields.Adresse||"").split("\\n")[0])+(l.fields.Website?' · <a href="'+esc(l.fields.Website)+'" target="_blank" style="color:var(--txt-2)">Website</a>':'')+'</span></div></div></td>'+
         '<td>'+(l.fields.Motiv?'<span class="badge lauf">'+esc(l.fields.Motiv)+'</span>':'<span class="dim">—</span>')+'</td>'+
         '<td>'+([l.fields.qm?l.fields.qm+" m²":"",l.fields.Etage||""].filter(Boolean).join(" · ")||'<span class="dim">—</span>')+'</td>'+
@@ -404,7 +401,7 @@ function tafelLocations(list){
 }
 
 function tafel(list, mitMotiv){
-  return '<div class="board"><table><thead><tr><th></th><th>'+(mitMotiv?"Motiv / Location":"Location")+'</th><th>Status</th><th>Adresse</th><th>Kontakt</th><th>Motivgeber</th><th>Regie</th><th>Wiedervorlage</th><th class="r">Preis</th></tr></thead><tbody>'+
+  return '<div class="board"><table><thead><tr><th></th><th></th><th>'+(mitMotiv?"Motiv / Location":"Location")+'</th><th>Status</th><th>Adresse</th><th>Kontakt</th><th>Motivgeber</th><th>Regie</th><th>Wiedervorlage</th><th class="r">Preis</th></tr></thead><tbody>'+
     list.map(a=>{
       const l = locOf(a) || {fields:{}};
       const s = st(a.fields.Status);
@@ -423,7 +420,7 @@ function tafel(list, mitMotiv){
         '<td>'+fotoZelle+'</td>'+
         '<td><div class="name"><div class="stripe '+s.ton+'"></div><div><b>'+esc(l.fields.Name||a.fields.Titel||"ohne Namen")+'</b>'+
         '<span>'+esc(mitMotiv?(l.fields.Motiv||""):"")+(l.fields.Website?(mitMotiv?' · ':'')+'<a href="'+esc(l.fields.Website)+'" target="_blank" style="color:var(--txt-2)">Website</a>':'')+'</span></div></div></td>'+
-        '<td><span class="badge '+s.ton+'">'+s.id+'</span></td>'+
+        '<td><span class="badge '+s.ton+'">'+s.label+'</span></td>'+
         '<td>'+(l.fields.Adresse?esc(l.fields.Adresse.split("\\n")[0]):'<span class="dim">—</span>')+'</td>'+
         '<td>'+[a.fields.Ansprechpartner,a.fields.Telefon||l.fields.Telefon,a.fields.Mail||l.fields.Mail].filter(Boolean).map(esc).join("<br>")+'</td>'+
         '<td><span class="badge '+rmTon+'">'+rm+'</span></td>'+
@@ -451,7 +448,7 @@ function maske(a){
     '<div id="locBlock"></div>'+
     '<div class="secTitle">Anfrage</div>'+
     '<div class="grid">'+
-      f("status","STATUS")+'<select data-k="Status" id="selStatus">'+STATUS.map(s=>'<option'+(a.fields.Status===s.id?" selected":"")+'>'+s.id+'</option>').join("")+'</select><div class="tip" id="tipStatus">'+st(a.fields.Status||"Recherchiert").hint+'</div></div>'+
+      f("status","STATUS")+'<select data-k="Status" id="selStatus">'+STATUS.map(s=>'<option value="'+s.id+'"'+(a.fields.Status===s.id?" selected":"")+'>'+s.label+'</option>').join("")+'</select><div class="tip" id="tipStatus">'+st(a.fields.Status||"Recherchiert").hint+'</div></div>'+
       f("projekt","PROJEKT")+'<input data-k="Projekt" list="projektListe" value="'+esc(a.fields.Projekt||"")+'" placeholder="Heiland VI"></div>'+
       '<datalist id="projektListe">'+alleProjekte().map(p=>'<option value="'+esc(p)+'">').join("")+'</datalist>'+
       f("kontakt","ANSPRECHPARTNER")+'<input data-k="Ansprechpartner" value="'+esc(a.fields.Ansprechpartner||"")+'"></div>'+
@@ -465,6 +462,7 @@ function maske(a){
       f("preis","MIETE / PREIS"," wide")+'<textarea data-k="Preis" rows="3" placeholder="z.B.&#10;Drehtag: 5.000 netto&#10;Aufbautag: 2.500 netto&#10;Abbautag: 2.500 netto">'+esc(a.fields.Preis||"")+'</textarea></div>'+
       f("rueckmeldung","RÜCKMELDUNG MOTIVGEBER")+'<select data-k="Rückmeldung Motivgeber">'+["Offen","Interesse","Absage"].map(v=>'<option'+(a.fields["Rückmeldung Motivgeber"]===v?" selected":"")+'>'+v+'</option>').join("")+'</select></div>'+
       f("regie","ENTSCHEIDUNG REGIE")+'<select data-k="Entscheidung Regie">'+["Offen","Freigegeben","Abgelehnt"].map(v=>'<option'+(a.fields["Entscheidung Regie"]===v?" selected":"")+'>'+v+'</option>').join("")+'</select></div>'+
+      f("gesendet","AN AUFNAHMELEITER GESENDET")+'<input type="date" data-k="An Aufnahmeleiter gesendet" value="'+esc(a.fields["An Aufnahmeleiter gesendet"]||"")+'"><div class="tip">Selbst setzen, sobald diese Anfrage tatsächlich verschickt wurde — taucht danach nicht mehr im Export auf.</div></div>'+
       f("notiz","WAS WURDE GESAGT"," wide")+'<textarea data-k="Notiz" rows="4">'+esc(a.fields.Notiz||"")+'</textarea></div>'+
     '</div>'+
     '<div class="acts">'+(neu?"":'<button class="kill" data-kill>Löschen</button>')+'<div class="sp"></div><button class="cta quiet" data-x>Abbrechen</button><button class="cta" data-save>'+(neu?"Anlegen":"Sichern")+'</button></div>'+
@@ -571,7 +569,7 @@ function historieHtml(locId){
       const s = st(a.fields.Status);
       const datum = a.fields["Angefragt am"] ? dt(a.fields["Angefragt am"]) : (a.fields["Erstellt am"]?dt(a.fields["Erstellt am"]):"—");
       return '<div style="padding:10px 12px;'+(i<treffer.length-1?'border-bottom:1px solid var(--line);':'')+'display:flex;gap:10px;align-items:center;font-size:13px">'+
-        '<span class="badge '+s.ton+'" style="flex:none">'+s.id+'</span>'+
+        '<span class="badge '+s.ton+'" style="flex:none">'+s.label+'</span>'+
         '<span style="flex:1"><b>'+esc(a.fields.Projekt||"ohne Projekt")+'</b> · '+esc(a.fields.Ansprechpartner||"")+'</span>'+
         '<span class="dim">'+datum+'</span></div>';
     }).join("")+
@@ -679,20 +677,20 @@ async function loeschen(a){
   }catch(e){ warnIn("veilAlert","Löschen fehlgeschlagen: "+e.message); return false; }
 }
 
-function zeichnenBadgeMarkiert(){
-  const imArchiv = view==="archiv";
-  $("#btnMarkiert").style.display = (imArchiv && markiert.size>0) ? "inline-block" : "none";
-  $("#btnMarkiert").setAttribute("aria-pressed", nurMarkiert);
-  $("#markiertZahl").textContent = markiert.size;
-  $("#btnExportMarkiert").style.display = (imArchiv && markiert.size>0) ? "inline-block" : "none";
-}
-function exportMarkiert(){
-  const sp=["Name","Motiv","Adresse","Bezirk","Etage","qm","Ansprechpartner","Telefon","Mail","Website","Fotos (Drive-Link)","Notiz"];
+function exportAufnahmeleiter(){
+  const kandidaten = anfragen.filter(a=>a.fields.Status==="Gebucht" && !a.fields["An Aufnahmeleiter gesendet"]);
+  if(!kandidaten.length){ warn('Nichts zu exportieren — alle „Ausgesucht"-Anfragen wurden bereits als gesendet markiert.'); return; }
+  const sp=["Name","Motiv","Adresse","Bezirk","Etage","qm","Ansprechpartner","Telefon","Mail","Website","Fotos (Drive-Link)","Preis","Projekt","Notiz"];
   const c=v=>'"'+String(v??"").replace(/"/g,'""').replace(/\n/g," ")+'"';
-  const ausgewaehlt = locations.filter(l=>markiert.has(l.id));
-  const rows = ausgewaehlt.map(l=>[l.fields.Name,l.fields.Motiv,l.fields.Adresse,l.fields.Bezirk,l.fields.Etage,l.fields.qm,l.fields.Ansprechpartner,l.fields.Telefon,l.fields.Mail,l.fields.Website,l.fields["Fotos (Drive-Link)"],l.fields.Notiz].map(c).join(";"));
+  const rows = kandidaten.map(a=>{
+    const l = locOf(a)||{fields:{}};
+    return [l.fields.Name,l.fields.Motiv,l.fields.Adresse,l.fields.Bezirk,l.fields.Etage,l.fields.qm,
+      a.fields.Ansprechpartner||l.fields.Ansprechpartner,a.fields.Telefon||l.fields.Telefon,a.fields.Mail||l.fields.Mail,
+      l.fields.Website,l.fields["Fotos (Drive-Link)"],a.fields.Preis,a.fields.Projekt,a.fields.Notiz].map(c).join(";");
+  });
   const blob = new Blob(["\uFEFF"+[sp.map(c).join(";"),...rows].join("\n")],{type:"text/csv;charset=utf-8"});
-  const link=document.createElement("a"); link.href=URL.createObjectURL(blob); link.download="auswahl-aufnahmeleiter_"+heute()+".csv"; link.click();
+  const link=document.createElement("a"); link.href=URL.createObjectURL(blob); link.download="expose-aufnahmeleiter_"+heute()+".csv"; link.click();
+  warn("");
 }
 function csv(){
   const sp=["Location","Motiv","Adresse","Website","qm","Etage","Projekt","Status","Ansprechpartner","Telefon","Mail","Angefragt am","Kanal","Wiedervorlage","Preis","Notiz","Von"];
@@ -739,8 +737,6 @@ function filterMaske(){
 }
 
 document.addEventListener("click", ev=>{
-  const mk = ev.target.closest("[data-mark]");
-  if(mk){ const id=mk.dataset.mark; if(mk.checked) markiert.add(id); else markiert.delete(id); zeichnenBadgeMarkiert(); return; }
   const w = ev.target.closest("[data-wer]"); if(w){ wer=w.dataset.wer; return zeichnen(); }
   const p = ev.target.closest(".pill[data-view]"); if(p){ view=p.dataset.view; return zeichnen(); }
   const tr = ev.target.closest("tr[data-id]"); if(tr){ const it=anfragen.find(a=>a.id===tr.dataset.id); if(it) maske(it); }
@@ -748,8 +744,7 @@ document.addEventListener("click", ev=>{
 });
 $("#btnNeu").onclick = () => wer && maske(leerAnfrage());
 $("#btnFilter").onclick = filterMaske;
-$("#btnMarkiert").onclick = () => { nurMarkiert = !nurMarkiert; zeichnen(); };
-$("#btnExportMarkiert").onclick = exportMarkiert;
+$("#btnExportMarkiert").onclick = exportAufnahmeleiter;
 $("#btnNeuLoc").onclick = () => wer && maskeLocation({fields:{}});
 $("#btnSync").onclick = () => laden();
 $("#btnCsv").onclick = () => view==="archiv" ? csvArchiv() : csv();
