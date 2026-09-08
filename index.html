@@ -319,7 +319,7 @@ function sichtbar(){
     if(fQmMin && !(Number(l.fields.qm)>=Number(fQmMin))) return false;
     if(fQmMax && !(Number(l.fields.qm)<=Number(fQmMax))) return false;
     if(!q) return true;
-    const felder = [a.fields.Titel,l.fields.Name,l.fields.Adresse,a.fields.Ansprechpartner,a.fields.Notiz,a.fields.Preis,l.fields.Motiv]
+    const felder = [a.fields.Titel,l.fields.Name,l.fields.Adresse,a.fields.Ansprechpartner,a.fields.Notiz,a.fields.Preis,l.fields.Motiv,st(a.fields.Status).label,a.fields["Rückmeldung Motivgeber"],a.fields["Entscheidung Regie"]]
       .map(v=>(v||"").toLowerCase());
     return q.toLowerCase().split(/\s+/).filter(Boolean).every(wort => felder.some(f=>f.includes(wort)));
   });
