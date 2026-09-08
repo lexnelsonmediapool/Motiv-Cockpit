@@ -400,7 +400,7 @@ function tafelLocations(list){
       return '<tr data-locid="'+l.id+'"><td><div class="name"><div class="stripe neon"></div><div><b>'+esc(l.fields.Name||"ohne Namen")+'</b>'+
         '<span>'+esc((l.fields.Adresse||"").split("\\n")[0])+(l.fields.Website?' · <a href="'+esc(l.fields.Website)+'" target="_blank" style="color:var(--txt-2)">Website</a>':'')+'</span></div></div></td>'+
         '<td>'+(l.fields.Motiv?'<span class="badge lauf">'+esc(l.fields.Motiv)+'</span>':'<span class="dim">—</span>')+'</td>'+
-        '<td>'+([l.fields.qm?l.fields.qm+" m²":"",l.fields.Etage||""].filter(Boolean).join(" · ")||'<span class="dim">—</span>')+'</td>'+
+        '<td>'+([l.fields.qm?l.fields.qm+" m²":"",l.fields.Zimmer?l.fields.Zimmer+" Zi":"",l.fields.Etage||""].filter(Boolean).join(" · ")||'<span class="dim">—</span>')+'</td>'+
         '<td>'+(l.fields.Bezirk?esc(l.fields.Bezirk):'<span class="dim">—</span>')+'</td>'+
         '<td>'+(l.fields.Ansprechpartner?esc(l.fields.Ansprechpartner):'<span class="dim">—</span>')+'</td>'+
         '<td>'+(l.fields["Erstellt am"]?dt(l.fields["Erstellt am"]):'<span class="dim">—</span>')+'</td></tr>';
@@ -498,6 +498,7 @@ function maske(a){
           '<datalist id="motivListe2">'+alleAllgMotive().map(m=>'<option value="'+esc(m)+'">').join("")+'</datalist>'+
           f("nEtage","ETAGE")+'<select id="nEtage"><option value="">—</option>'+ETAGEN.map(e=>'<option'+(offen._locNeu.Etage===e?" selected":"")+'>'+e+'</option>').join("")+'</select></div>'+
           f("nQm","QM")+'<input id="nQm" type="number" value="'+esc(offen._locNeu.qm||"")+'"></div>'+
+          f("nZimmer","ZIMMER")+'<input id="nZimmer" type="number" value="'+esc(offen._locNeu.Zimmer||"")+'"></div>'+
           f("nAdresse","ADRESSE"," wide")+'<textarea id="nAdresse" rows="2">'+esc(offen._locNeu.Adresse||"")+'</textarea></div>'+
           f("nWeb","WEBSITE"," wide")+'<input id="nWeb" value="'+esc(offen._locNeu.Website||"")+'"></div>'+
           f("nFotos","FOTOS (DRIVE-LINK)"," wide")+'<input id="nFotos" value="'+esc(offen._locNeu["Fotos (Drive-Link)"]||"")+'"></div>'+
@@ -551,7 +552,7 @@ function maske(a){
       return;
     }
     if(offen._locNeu){
-      ["nMotiv:Motiv","nEtage:Etage","nQm:qm","nAdresse:Adresse","nWeb:Website","nFotos:Fotos (Drive-Link)"].forEach(pair=>{
+      ["nMotiv:Motiv","nEtage:Etage","nQm:qm","nZimmer:Zimmer","nAdresse:Adresse","nWeb:Website","nFotos:Fotos (Drive-Link)"].forEach(pair=>{
         const [id,key]=pair.split(":"); const el=document.getElementById(id);
         if(el) offen._locNeu[key]=el.value;
       });
@@ -598,6 +599,7 @@ function maskeLocation(l){
       '<datalist id="motivListe">'+alleAllgMotive().map(m=>'<option value="'+esc(m)+'">').join("")+'</datalist>'+
       f("etage","ETAGE")+'<select data-lk="Etage"><option value="">—</option>'+ETAGEN.map(e=>'<option'+(flds.Etage===e?" selected":"")+'>'+e+'</option>').join("")+'</select></div>'+
       f("qm","QM")+'<input data-lk="qm" type="number" value="'+esc(flds.qm||"")+'"></div>'+
+      f("zimmer","ZIMMER")+'<input data-lk="Zimmer" type="number" value="'+esc(flds.Zimmer||"")+'"></div>'+
       f("bezirk","BEZIRK")+'<select data-lk="Bezirk"><option value="">—</option>'+BEZIRKE.map(b=>'<option'+(flds.Bezirk===b?" selected":"")+'>'+b+'</option>').join("")+'</select></div>'+
       f("adresse","ADRESSE"," wide")+'<textarea data-lk="Adresse" rows="2">'+esc(flds.Adresse||"")+'</textarea></div>'+
       f("web","WEBSITE"," wide")+'<input data-lk="Website" value="'+esc(flds.Website||"")+'"></div>'+
@@ -646,6 +648,7 @@ function maskeLocation(l){
       const fields = Object.assign({}, flds, patch);
       if(!fields.Name){ nameEl.focus(); warnIn("veilAlertLoc","Name ist Pflicht."); return; }
       if(fields.qm) fields.qm = Number(fields.qm);
+      if(fields.Zimmer) fields.Zimmer = Number(fields.Zimmer);
       if(neu){ fields["Angelegt von"] = wer; fields["Erstellt am"] = heute(); }
       try{
         if(neu) await api(TBL_LOC, {method:"POST", body: JSON.stringify({records:[{fields}], typecast:true})});
@@ -669,6 +672,7 @@ async function sichern(){
     if(offen._locNeu){
       const flds = Object.assign({}, offen._locNeu, {"Angelegt von": wer, "Erstellt am": heute()});
       if(flds.qm) flds.qm = Number(flds.qm);
+      if(flds.Zimmer) flds.Zimmer = Number(flds.Zimmer);
       const created = await api(TBL_LOC, {method:"POST", body: JSON.stringify({records:[{fields:flds}], typecast:true})});
       locId = created.records[0].id;
     }
@@ -689,11 +693,11 @@ async function loeschen(a){
 function exportAufnahmeleiter(){
   const kandidaten = anfragen.filter(a=>a.fields.Status==="Gebucht" && !a.fields["An Aufnahmeleiter gesendet"]);
   if(!kandidaten.length){ warn('Nichts zu exportieren — alle „Ausgesucht"-Anfragen wurden bereits als gesendet markiert.'); return; }
-  const sp=["Motiv (Drehbuch)","Name","Adresse","Bezirk","Etage","qm","Ansprechpartner","Telefon","Mail","Website","Fotos (Drive-Link)","Preis","Projekt","Notiz"];
+  const sp=["Motiv (Drehbuch)","Name","Adresse","Bezirk","Etage","qm","Zimmer","Ansprechpartner","Telefon","Mail","Website","Fotos (Drive-Link)","Preis","Projekt","Notiz"];
   const c=v=>'"'+String(v??"").replace(/"/g,'""').replace(/\n/g," ")+'"';
   const rows = kandidaten.map(a=>{
     const l = locOf(a)||{fields:{}};
-    return [a.fields["Motiv (Drehbuch)"],l.fields.Name,l.fields.Adresse,l.fields.Bezirk,l.fields.Etage,l.fields.qm,
+    return [a.fields["Motiv (Drehbuch)"],l.fields.Name,l.fields.Adresse,l.fields.Bezirk,l.fields.Etage,l.fields.qm,l.fields.Zimmer,
       a.fields.Ansprechpartner||l.fields.Ansprechpartner,a.fields.Telefon||l.fields.Telefon,a.fields.Mail||l.fields.Mail,
       l.fields.Website,l.fields["Fotos (Drive-Link)"],a.fields.Preis,a.fields.Projekt,a.fields.Notiz].map(c).join(";");
   });
@@ -709,9 +713,9 @@ function csv(){
   const link=document.createElement("a"); link.href=URL.createObjectURL(blob); link.download="anfragen_"+heute()+".csv"; link.click();
 }
 function csvArchiv(){
-  const sp=["Name","Motiv","Adresse","Website","qm","Etage","Ansprechpartner","Telefon","Mail","Fotos (Drive-Link)","Notiz","Angelegt von","Erstellt am"];
+  const sp=["Name","Motiv","Adresse","Website","qm","Zimmer","Etage","Bezirk","Ansprechpartner","Telefon","Mail","Fotos (Drive-Link)","Notiz","Angelegt von","Erstellt am"];
   const c=v=>'"'+String(v??"").replace(/"/g,'""').replace(/\n/g," ")+'"';
-  const rows = locations.map(l=>[l.fields.Name,l.fields.Motiv,l.fields.Adresse,l.fields.Website,l.fields.qm,l.fields.Etage,l.fields.Ansprechpartner,l.fields.Telefon,l.fields.Mail,l.fields["Fotos (Drive-Link)"],l.fields.Notiz,l.fields["Angelegt von"],l.fields["Erstellt am"]].map(c).join(";"));
+  const rows = locations.map(l=>[l.fields.Name,l.fields.Motiv,l.fields.Adresse,l.fields.Website,l.fields.qm,l.fields.Zimmer,l.fields.Etage,l.fields.Bezirk,l.fields.Ansprechpartner,l.fields.Telefon,l.fields.Mail,l.fields["Fotos (Drive-Link)"],l.fields.Notiz,l.fields["Angelegt von"],l.fields["Erstellt am"]].map(c).join(";"));
   const blob = new Blob(["\uFEFF"+[sp.map(c).join(";"),...rows].join("\n")],{type:"text/csv;charset=utf-8"});
   const link=document.createElement("a"); link.href=URL.createObjectURL(blob); link.download="archiv_"+heute()+".csv"; link.click();
 }
