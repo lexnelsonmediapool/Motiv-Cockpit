@@ -114,6 +114,7 @@ td.r{text-align:right}
     <div><div class="eyebrow" id="eyebrow">MOTIVSUCHE</div><h1>Wen haben wir gefragt?</h1></div>
     <div class="sp"></div>
     <button class="cta quiet" id="btnCsv">Als CSV laden</button>
+    <button class="cta quiet" id="btnExportMarkiert" style="display:none">Exposé für Aufnahmeleiter</button>
     <button class="cta quiet" id="btnSync">Aktualisieren</button>
     <button class="cta quiet" id="btnNeuLoc" disabled>+ Location anlegen</button>
     <button class="cta" id="btnNeu" disabled>+ Anfrage anlegen</button>
@@ -125,6 +126,7 @@ td.r{text-align:right}
     <button class="pill" data-view="motive">Nach Motiv</button>
     <button class="pill" data-view="alle">Alle Anfragen</button>
     <button class="pill" data-view="archiv">Archiv (alle Locations)</button>
+    <button class="pill" id="btnMarkiert" style="display:none">☑ Markiert (<span id="markiertZahl">0</span>)</button>
     <div class="sp"></div>
     <select id="fProjekt" style="max-width:200px"></select>
     <input class="suche" id="suche" placeholder="Suchen">
@@ -134,7 +136,7 @@ td.r{text-align:right}
   <div id="body"></div>
   <div class="note" id="stand"></div>
 </div>
- 
+
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <script>
 const TOKEN = "patTvsHc5FOQHpIj8.e8a3f7c2c484ccdaa7977bc729733c7d63dde2cd3df82cc2e60c5e99e8f1dd18";
@@ -142,7 +144,7 @@ const BASE = "appkllF2qSGRuxYt1";
 const TBL_LOC = "tblNzlozaIyBXNO8p";
 const TBL_ANF = "tblAf3hMsbyq9lc0V";
 const API = "https://api.airtable.com/v0/" + BASE + "/";
- 
+
 const MOTIVE = ["Show Außengelände","Aufenthaltsraum","Schnittraum","Präsentationsraum","Schule",
   "Plattenbauwohnung","Krankenhaus","Büro Staatsanwältin Kraus","Restaurant Pileckis",
   "Wohnung Linda","Wohnung Marion","Nagelstudio","Verpackungsbetrieb","Sonstiges"];
@@ -157,10 +159,11 @@ const STATUS = [
   {id:"Gebucht",ton:"neon",hint:"fix"},
   {id:"Absage",ton:"aus",hint:"erledigt"}];
 const KANAL = ["Mail","Telefon","BBFC","Vor Ort","Über Kontakt"];
- 
+
 let locations = [], anfragen = [], wer = "", view = "tun", q = "", fMotiv = "", offen = null, stand = "";
 let fEtage = "", fQmMin = "", fQmMax = "", fBezirk = "", fProjekt = "";
- 
+let markiert = new Set(), nurMarkiert = false;
+
 const $ = s => document.querySelector(s);
 function driveThumb(url, size){
   if(!url) return null;
@@ -186,7 +189,7 @@ function driveOrdnerId(url){
 const GOOGLE_CLIENT_ID = "852835258646-fshlr2lli09rbpr39t98b5tcc7r8lqbb.apps.googleusercontent.com";
 let driveToken = null, driveTokenClient = null, galUid = 0;
 const galFiles = {};
- 
+
 function initGoogle(){
   if(typeof google === "undefined" || !google.accounts){ setTimeout(initGoogle, 300); return; }
   driveTokenClient = google.accounts.oauth2.initTokenClient({
@@ -205,7 +208,7 @@ document.getElementById("btnGoogle").onclick = () => {
   driveTokenClient.requestAccessToken();
 };
 initGoogle();
- 
+
 function driveGalerie(url){
   const id = driveOrdnerId(url);
   if(!id) return '<div class="tip">Kein Fotoordner hinterlegt.</div>';
@@ -221,7 +224,7 @@ function driveGalerie(url){
   }
   return '<div id="'+cid+'" data-galpending data-folder="'+id+'">'+fallback+'</div>';
 }
- 
+
 async function ladeGalerieFotos(containerId, folderId){
   const el = document.getElementById(containerId);
   if(!el || !driveToken) return;
@@ -242,7 +245,7 @@ async function ladeGalerieFotos(containerId, folderId){
     el.innerHTML = '<div class="tip">Fotos laden fehlgeschlagen. <a href="https://drive.google.com/drive/folders/'+folderId+'" target="_blank" rel="noopener" style="color:var(--neon)">Ordner in Drive öffnen ↗</a></div>';
   }
 }
- 
+
 function lightbox(containerId, idx){
   const files = galFiles[containerId]; if(!files) return;
   idx = ((idx % files.length) + files.length) % files.length;
@@ -277,7 +280,7 @@ function warnIn(id, t){
   if(el) el.innerHTML = t ? '<div class="alert">'+esc(t)+'</div>' : "";
   warn(t);
 }
- 
+
 async function api(path, opts){
   const r = await fetch(API+path, Object.assign({headers:{Authorization:"Bearer "+TOKEN,"Content-Type":"application/json"}}, opts||{}));
   if(!r.ok){ const t = await r.text(); throw new Error(r.status+": "+t.slice(0,160)); }
@@ -291,7 +294,7 @@ async function alle(tableId){
   }while(offset);
   return out;
 }
- 
+
 async function laden(still){
   try{
     const [l,a] = await Promise.all([alle(TBL_LOC), alle(TBL_ANF)]);
@@ -301,13 +304,13 @@ async function laden(still){
   }catch(e){ warn("Airtable antwortet gerade nicht (" + e.message + "). Zuletzt geladener Stand bleibt sichtbar."); }
   zeichnen();
 }
- 
+
 const offeneListe = list => list.filter(a=>{
   if(["Gebucht","Absage"].includes(a.fields.Status)) return false;
   if(a.fields.Status==="Recherchiert") return true;
   return a.fields.Wiedervorlage && a.fields.Wiedervorlage <= heute();
 }).sort((x,y)=>((x.fields.Wiedervorlage||"9")<(y.fields.Wiedervorlage||"9")?-1:1));
- 
+
 function sichtbar(){
   return anfragen.filter(a=>{
     const l = locOf(a) || {fields:{}};
@@ -323,19 +326,19 @@ function sichtbar(){
     return q.toLowerCase().split(/\s+/).filter(Boolean).every(wort => felder.some(f=>f.includes(wort)));
   });
 }
- 
+
 function zeichnen(){
   const sicht = sichtbar(), tun = offeneListe(sicht);
   const gebucht = anfragen.filter(a=>a.fields.Status==="Gebucht");
   const laufend = anfragen.filter(a=>["Angefragt","Rückfrage","Besichtigung","Möglich"].includes(a.fields.Status));
   const versorgt = MOTIVE.filter(m=>anfragen.some(a=>{const l=locOf(a);return l&&l.fields.Motiv===m&&a.fields.Status!=="Absage";})).length;
   const ohne = MOTIVE.filter(m=>!anfragen.some(a=>{const l=locOf(a);return l&&l.fields.Motiv===m&&a.fields.Status!=="Absage";}));
- 
+
   $("#whoami").innerHTML = ["Stefan","Romy"].map(n=>'<button data-wer="'+n+'" aria-pressed="'+(wer===n)+'">'+n+'</button>').join("");
   $("#btnNeu").disabled = !wer;
   $("#btnNeuLoc").disabled = !wer;
   $("#eyebrow").textContent = "MOTIVSUCHE · " + MOTIVE.length + " MOTIVE · AIRTABLE LIVE";
- 
+
   $("#kpis").innerHTML = [
     ['a','MOTIVE VERSORGT', versorgt+'<span class="unit">von '+MOTIVE.length+'</span>', ohne.length?'Noch nichts für: '+ohne.slice(0,3).join(", ")+(ohne.length>3?" +"+(ohne.length-3):""):'Für jedes Motiv liegt etwas vor.'],
     ['b','ZU TUN', offeneListe(anfragen).length+'<span class="unit">Anfragen</span>', 'Nicht angefragt oder Wiedervorlage überfällig.'],
@@ -343,7 +346,7 @@ function zeichnen(){
     ['d','GEBUCHT', gebucht.length+'<span class="unit">fix</span>', gebucht.length?gebucht.slice(0,2).map(a=>(locOf(a)||{}).fields?.Name||a.fields.Titel).join(" · "):'Noch nichts unter Dach und Fach.'],
     ['','LOCATIONS GESAMT', locations.length+'<span class="unit">im Archiv</span>', stand?'Live aus Airtable, zuletzt geladen '+stand+'.':'Live aus Airtable.']
   ].map(([k,h,n,f])=>'<div class="kpi '+k+'"><h3>'+h+'</h3><div class="num">'+n+'</div><div class="foot">'+esc(f)+'</div></div>').join("");
- 
+
   $("#fMotiv").innerHTML = '<option value="">Alle Motive</option>'+alleMotive().map(m=>'<option'+(fMotiv===m?' selected':'')+'>'+esc(m)+'</option>').join("");
   const projekte = alleProjekte();
   $("#fProjekt").style.display = view==="archiv" ? "none" : "inline-block";
@@ -353,7 +356,8 @@ function zeichnen(){
   $("#filterBadge").style.display = filterAktiv ? "flex" : "none";
   document.querySelectorAll(".pill[data-view]").forEach(b=>b.setAttribute("aria-pressed", b.dataset.view===view));
   $("#btnCsv").textContent = view==="archiv" ? "Archiv als CSV laden" : "Anfragen als CSV laden";
- 
+  zeichnenBadgeMarkiert();
+
   const b = $("#body");
   if(view==="tun") b.innerHTML = tun.length ? tafel(tun,true) : '<div class="board"><div class="blank">Nichts fällig.<br>Entweder ist alles nachgefasst — oder es fehlen noch Anfragen.</div></div>';
   else if(view==="alle") b.innerHTML = sicht.length ? tafel(sicht,true) : '<div class="board"><div class="blank">Noch keine Anfragen. Leg oben die erste an.</div></div>';
@@ -367,12 +371,13 @@ function zeichnen(){
     return '<div style="margin-bottom:26px"><div style="display:flex;align-items:center;gap:14px;padding-bottom:11px;margin-bottom:2px;border-bottom:1px solid var(--line-2)"><h2 style="font-size:15px;font-weight:650;margin:0">'+esc(m)+'</h2><span style="font-size:12px;color:var(--txt-3)">'+(e.length?e.length+" · "+lauf+" im Gespräch":"noch nichts")+'</span></div>'+
       (e.length ? tafel(e,false) : '<div class="board"><div class="blank">Hier fehlt noch alles.</div></div>')+'</div>';
   }).join("");
- 
+
   $("#stand").textContent = "Läuft direkt gegen eure Airtable-Datenbank, keine Zwischenkopie." + (stand ? " Zuletzt geladen um "+stand+" Uhr." : "");
 }
- 
+
 function sichtbarLocations(){
   return locations.filter(l=>{
+    if(nurMarkiert && !markiert.has(l.id)) return false;
     if(fMotiv && l.fields.Motiv !== fMotiv) return false;
     if(fEtage && l.fields.Etage !== fEtage) return false;
     if(fBezirk && l.fields.Bezirk !== fBezirk) return false;
@@ -384,11 +389,11 @@ function sichtbarLocations(){
     return q.toLowerCase().split(/\s+/).filter(Boolean).every(wort => felder.some(f=>f.includes(wort)));
   }).sort((a,b)=>(b.fields["Erstellt am"]||"").localeCompare(a.fields["Erstellt am"]||""));
 }
- 
+
 function tafelLocations(list){
-  return '<div class="board"><table><thead><tr><th>Location</th><th>Motiv</th><th>Größe</th><th>Bezirk</th><th>Ansprechpartner</th><th>Erstellt am</th></tr></thead><tbody>'+
+  return '<div class="board"><table><thead><tr><th></th><th>Location</th><th>Motiv</th><th>Größe</th><th>Bezirk</th><th>Ansprechpartner</th><th>Erstellt am</th></tr></thead><tbody>'+
     list.map(l=>{
-      return '<tr data-locid="'+l.id+'"><td><div class="name"><div class="stripe neon"></div><div><b>'+esc(l.fields.Name||"ohne Namen")+'</b>'+
+      return '<tr data-locid="'+l.id+'"><td><input type="checkbox" data-mark="'+l.id+'"'+(markiert.has(l.id)?' checked':'')+' style="width:16px;height:16px;cursor:pointer"></td><td><div class="name"><div class="stripe neon"></div><div><b>'+esc(l.fields.Name||"ohne Namen")+'</b>'+
         '<span>'+esc((l.fields.Adresse||"").split("\\n")[0])+(l.fields.Website?' · <a href="'+esc(l.fields.Website)+'" target="_blank" style="color:var(--txt-2)">Website</a>':'')+'</span></div></div></td>'+
         '<td>'+(l.fields.Motiv?'<span class="badge lauf">'+esc(l.fields.Motiv)+'</span>':'<span class="dim">—</span>')+'</td>'+
         '<td>'+([l.fields.qm?l.fields.qm+" m²":"",l.fields.Etage||""].filter(Boolean).join(" · ")||'<span class="dim">—</span>')+'</td>'+
@@ -397,7 +402,7 @@ function tafelLocations(list){
         '<td>'+(l.fields["Erstellt am"]?dt(l.fields["Erstellt am"]):'<span class="dim">—</span>')+'</td></tr>';
     }).join("")+'</tbody></table></div>';
 }
- 
+
 function tafel(list, mitMotiv){
   return '<div class="board"><table><thead><tr><th></th><th>'+(mitMotiv?"Motiv / Location":"Location")+'</th><th>Status</th><th>Adresse</th><th>Kontakt</th><th>Motivgeber</th><th>Regie</th><th>Wiedervorlage</th><th class="r">Preis</th></tr></thead><tbody>'+
     list.map(a=>{
@@ -427,9 +432,9 @@ function tafel(list, mitMotiv){
         '<td class="r" style="white-space:pre-line">'+(a.fields.Preis?esc(a.fields.Preis):'<span class="dim">—</span>')+'</td></tr>';
     }).join("")+'</tbody></table></div>';
 }
- 
+
 function leerAnfrage(){ return {id:null,fields:{Status:"Recherchiert",Von:wer}}; }
- 
+
 function maske(a){
   offen = JSON.parse(JSON.stringify(a));
   offen._locId = a.id ? (locOf(a)||{}).id||null : null;
@@ -464,7 +469,7 @@ function maske(a){
     '</div>'+
     '<div class="acts">'+(neu?"":'<button class="kill" data-kill>Löschen</button>')+'<div class="sp"></div><button class="cta quiet" data-x>Abbrechen</button><button class="cta" data-save>'+(neu?"Anlegen":"Sichern")+'</button></div>'+
    '</div></div>');
- 
+
   function locBlockZeichnen(){
     const b = $("#locBlock");
     if(offen._locId || offen._locNeu){
@@ -494,7 +499,7 @@ function maske(a){
     } else b.innerHTML = "";
   }
   locBlockZeichnen();
- 
+
   const veil = $("#veil");
   $("#locSuche").addEventListener("input", e=>{
     const val = e.target.value.trim();
@@ -555,7 +560,23 @@ function maske(a){
   });
 }
 function zu(){ const v=$("#veil"); if(v) v.remove(); offen=null; }
- 
+
+function historieHtml(locId){
+  const treffer = anfragen.filter(a=>(a.fields.Location||[])[0]===locId)
+    .sort((a,b)=>(b.fields["Angefragt am"]||b.fields["Erstellt am"]||"").localeCompare(a.fields["Angefragt am"]||a.fields["Erstellt am"]||""));
+  if(!treffer.length) return '<div class="secTitle">Verwendungshistorie</div><div class="tip" style="margin-bottom:6px">Noch bei keinem Projekt angefragt.</div>';
+  return '<div class="secTitle">Verwendungshistorie</div>'+
+    '<div style="border:1px solid var(--line-2);border-radius:9px;overflow:hidden;margin-bottom:6px">'+
+    treffer.map((a,i)=>{
+      const s = st(a.fields.Status);
+      const datum = a.fields["Angefragt am"] ? dt(a.fields["Angefragt am"]) : (a.fields["Erstellt am"]?dt(a.fields["Erstellt am"]):"—");
+      return '<div style="padding:10px 12px;'+(i<treffer.length-1?'border-bottom:1px solid var(--line);':'')+'display:flex;gap:10px;align-items:center;font-size:13px">'+
+        '<span class="badge '+s.ton+'" style="flex:none">'+s.id+'</span>'+
+        '<span style="flex:1"><b>'+esc(a.fields.Projekt||"ohne Projekt")+'</b> · '+esc(a.fields.Ansprechpartner||"")+'</span>'+
+        '<span class="dim">'+datum+'</span></div>';
+    }).join("")+
+    '</div>';
+}
 function maskeLocation(l){
   const neu = !l.id;
   const flds = l.fields || {};
@@ -583,6 +604,7 @@ function maskeLocation(l){
       f("titelfoto","TITELFOTO"," wide")+'<input data-lk="Titelfoto (Drive-Link)" value="'+esc(flds["Titelfoto (Drive-Link)"]||"")+'" placeholder="Link von einem einzelnen Foto"></div>'+
       '<div class="fld wide" id="titelfotoVorschau">'+(driveThumb(flds["Titelfoto (Drive-Link)"],120)?'<img src="'+driveThumb(flds["Titelfoto (Drive-Link)"],120)+'" onerror="this.outerHTML=\'<div class=&quot;tip&quot;>Lädt nicht — dieses Foto in Drive öffnen, Rechtsklick, Freigeben, extra auf &quot;Jeder mit dem Link&quot; stellen. Nicht nur der Ordner, dieses eine Foto.</div>\'" style="height:80px;border-radius:8px;border:1px solid var(--line-2)">':'<div class="tip">Wichtig: Nicht den Ordner-Link, sondern von einem einzelnen Foto. Und: dieses Foto muss zusätzlich extra auf „Jeder mit dem Link" freigegeben sein — der offene Ordner allein reicht nicht.</div>')+'</div>'+
     '</div>'+
+    (neu ? "" : historieHtml(l.id)) +
     '<div class="acts">'+(neu?"":'<button class="kill" data-lkill>Löschen</button>')+'<div class="sp"></div><button class="cta quiet" data-lx>Abbrechen</button><button class="cta" data-lsave>'+(neu?"In der Datenbank anlegen":"Sichern")+'</button></div>'+
    '</div></div>');
   const patch = {};
@@ -626,14 +648,14 @@ function maskeLocation(l){
     }
   });
 }
- 
+
 const ANFRAGEN_LOOKUP_FELDER = ["Adresse (Location)","Fotos (Location)","Titelfoto (Location)","Fotos (Links, Location)"];
 function ohneLookups(fields){
   const out = Object.assign({}, fields);
   ANFRAGEN_LOOKUP_FELDER.forEach(k => delete out[k]);
   return out;
 }
- 
+
 async function sichern(){
   try{
     let locId = offen._locId;
@@ -656,7 +678,22 @@ async function loeschen(a){
     await laden(); return true;
   }catch(e){ warnIn("veilAlert","Löschen fehlgeschlagen: "+e.message); return false; }
 }
- 
+
+function zeichnenBadgeMarkiert(){
+  const imArchiv = view==="archiv";
+  $("#btnMarkiert").style.display = (imArchiv && markiert.size>0) ? "inline-block" : "none";
+  $("#btnMarkiert").setAttribute("aria-pressed", nurMarkiert);
+  $("#markiertZahl").textContent = markiert.size;
+  $("#btnExportMarkiert").style.display = (imArchiv && markiert.size>0) ? "inline-block" : "none";
+}
+function exportMarkiert(){
+  const sp=["Name","Motiv","Adresse","Bezirk","Etage","qm","Ansprechpartner","Telefon","Mail","Website","Fotos (Drive-Link)","Notiz"];
+  const c=v=>'"'+String(v??"").replace(/"/g,'""').replace(/\n/g," ")+'"';
+  const ausgewaehlt = locations.filter(l=>markiert.has(l.id));
+  const rows = ausgewaehlt.map(l=>[l.fields.Name,l.fields.Motiv,l.fields.Adresse,l.fields.Bezirk,l.fields.Etage,l.fields.qm,l.fields.Ansprechpartner,l.fields.Telefon,l.fields.Mail,l.fields.Website,l.fields["Fotos (Drive-Link)"],l.fields.Notiz].map(c).join(";"));
+  const blob = new Blob(["\uFEFF"+[sp.map(c).join(";"),...rows].join("\n")],{type:"text/csv;charset=utf-8"});
+  const link=document.createElement("a"); link.href=URL.createObjectURL(blob); link.download="auswahl-aufnahmeleiter_"+heute()+".csv"; link.click();
+}
 function csv(){
   const sp=["Location","Motiv","Adresse","Website","qm","Etage","Projekt","Status","Ansprechpartner","Telefon","Mail","Angefragt am","Kanal","Wiedervorlage","Preis","Notiz","Von"];
   const c=v=>'"'+String(v??"").replace(/"/g,'""').replace(/\n/g," ")+'"';
@@ -671,7 +708,7 @@ function csvArchiv(){
   const blob = new Blob(["\uFEFF"+[sp.map(c).join(";"),...rows].join("\n")],{type:"text/csv;charset=utf-8"});
   const link=document.createElement("a"); link.href=URL.createObjectURL(blob); link.download="archiv_"+heute()+".csv"; link.click();
 }
- 
+
 function filterMaske(){
   document.body.insertAdjacentHTML("beforeend",
    '<div class="veil" id="veilFilter"><div class="sheet" style="max-width:480px">'+
@@ -700,8 +737,10 @@ function filterMaske(){
     }
   });
 }
- 
+
 document.addEventListener("click", ev=>{
+  const mk = ev.target.closest("[data-mark]");
+  if(mk){ const id=mk.dataset.mark; if(mk.checked) markiert.add(id); else markiert.delete(id); zeichnenBadgeMarkiert(); return; }
   const w = ev.target.closest("[data-wer]"); if(w){ wer=w.dataset.wer; return zeichnen(); }
   const p = ev.target.closest(".pill[data-view]"); if(p){ view=p.dataset.view; return zeichnen(); }
   const tr = ev.target.closest("tr[data-id]"); if(tr){ const it=anfragen.find(a=>a.id===tr.dataset.id); if(it) maske(it); }
@@ -709,13 +748,15 @@ document.addEventListener("click", ev=>{
 });
 $("#btnNeu").onclick = () => wer && maske(leerAnfrage());
 $("#btnFilter").onclick = filterMaske;
+$("#btnMarkiert").onclick = () => { nurMarkiert = !nurMarkiert; zeichnen(); };
+$("#btnExportMarkiert").onclick = exportMarkiert;
 $("#btnNeuLoc").onclick = () => wer && maskeLocation({fields:{}});
 $("#btnSync").onclick = () => laden();
 $("#btnCsv").onclick = () => view==="archiv" ? csvArchiv() : csv();
 $("#suche").oninput = e => { q=e.target.value; zeichnen(); };
 $("#fMotiv").onchange = e => { fMotiv=e.target.value; zeichnen(); };
 $("#fProjekt").onchange = e => { fProjekt=e.target.value; zeichnen(); };
- 
+
 zeichnen();
 laden();
 setInterval(()=>{ if(!offen) laden(true); }, 20000);
