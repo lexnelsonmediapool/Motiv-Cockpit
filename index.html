@@ -147,6 +147,8 @@ const API = "https://api.airtable.com/v0/" + BASE + "/";
 const MOTIVE = ["Show Außengelände","Aufenthaltsraum","Schnittraum","Präsentationsraum","Schule",
   "Plattenbauwohnung","Krankenhaus","Büro Staatsanwältin Kraus","Restaurant Pileckis",
   "Wohnung Linda","Wohnung Marion","Nagelstudio","Verpackungsbetrieb","Sonstiges"];
+const ALLG_MOTIVE = ["Wohnung","Haus","Büro","Schule","Krankenhaus","Restaurant","Ladengeschäft",
+  "Außengelände","Industrie/Gewerbe","Plattenbau","Sonstiges"];
 const ETAGEN = ["EG","Hochparterre","1. OG","2. OG","3. OG+"];
 const BEZIRKE = ["Charlottenburg-Wilmersdorf","Friedrichshain-Kreuzberg","Lichtenberg","Marzahn-Hellersdorf","Mitte","Neukölln","Pankow","Reinickendorf","Spandau","Steglitz-Zehlendorf","Tempelhof-Schöneberg","Treptow-Köpenick"];
 const STATUS = [
@@ -169,8 +171,13 @@ function driveThumb(url, size){
   if(!m) return null;
   return "https://drive.google.com/thumbnail?id="+m[0]+"&sz=w"+(size||160);
 }
-function alleMotive(){
+function alleSpezMotive(){
   const s = new Set(MOTIVE);
+  anfragen.forEach(a=>{ if(a.fields["Motiv (Drehbuch)"]) s.add(a.fields["Motiv (Drehbuch)"]); });
+  return [...s].sort((a,b)=>a.localeCompare(b,'de'));
+}
+function alleAllgMotive(){
+  const s = new Set(ALLG_MOTIVE);
   locations.forEach(l=>{ if(l.fields.Motiv) s.add(l.fields.Motiv); });
   return [...s].sort((a,b)=>a.localeCompare(b,'de'));
 }
@@ -312,14 +319,14 @@ const offeneListe = list => list.filter(a=>{
 function sichtbar(){
   return anfragen.filter(a=>{
     const l = locOf(a) || {fields:{}};
-    if(fMotiv && l.fields.Motiv !== fMotiv) return false;
+    if(fMotiv && (a.fields["Motiv (Drehbuch)"]||"") !== fMotiv) return false;
     if(fProjekt && (a.fields.Projekt||"") !== fProjekt) return false;
     if(fEtage && l.fields.Etage !== fEtage) return false;
     if(fBezirk && l.fields.Bezirk !== fBezirk) return false;
     if(fQmMin && !(Number(l.fields.qm)>=Number(fQmMin))) return false;
     if(fQmMax && !(Number(l.fields.qm)<=Number(fQmMax))) return false;
     if(!q) return true;
-    const felder = [a.fields.Titel,l.fields.Name,l.fields.Adresse,a.fields.Ansprechpartner,a.fields.Notiz,a.fields.Preis,l.fields.Motiv,st(a.fields.Status).label,a.fields["Rückmeldung Motivgeber"],a.fields["Entscheidung Regie"]]
+    const felder = [a.fields.Titel,l.fields.Name,l.fields.Adresse,a.fields.Ansprechpartner,a.fields.Notiz,a.fields.Preis,l.fields.Motiv,a.fields["Motiv (Drehbuch)"],st(a.fields.Status).label,a.fields["Rückmeldung Motivgeber"],a.fields["Entscheidung Regie"]]
       .map(v=>(v||"").toLowerCase());
     return q.toLowerCase().split(/\s+/).filter(Boolean).every(wort => felder.some(f=>f.includes(wort)));
   });
@@ -329,8 +336,8 @@ function zeichnen(){
   const sicht = sichtbar(), tun = offeneListe(sicht);
   const gebucht = anfragen.filter(a=>a.fields.Status==="Gebucht");
   const laufend = anfragen.filter(a=>["Angefragt","Rückfrage","Besichtigung","Möglich"].includes(a.fields.Status));
-  const versorgt = MOTIVE.filter(m=>anfragen.some(a=>{const l=locOf(a);return l&&l.fields.Motiv===m&&a.fields.Status!=="Absage";})).length;
-  const ohne = MOTIVE.filter(m=>!anfragen.some(a=>{const l=locOf(a);return l&&l.fields.Motiv===m&&a.fields.Status!=="Absage";}));
+  const versorgt = MOTIVE.filter(m=>anfragen.some(a=>(a.fields["Motiv (Drehbuch)"]||"")===m && a.fields.Status!=="Absage")).length;
+  const ohne = MOTIVE.filter(m=>!anfragen.some(a=>(a.fields["Motiv (Drehbuch)"]||"")===m && a.fields.Status!=="Absage"));
 
   $("#whoami").innerHTML = ["Stefan","Romy"].map(n=>'<button data-wer="'+n+'" aria-pressed="'+(wer===n)+'">'+n+'</button>').join("");
   $("#btnNeu").disabled = !wer;
@@ -345,7 +352,7 @@ function zeichnen(){
     ['','LOCATIONS GESAMT', locations.length+'<span class="unit">im Archiv</span>', stand?'Live aus Airtable, zuletzt geladen '+stand+'.':'Live aus Airtable.']
   ].map(([k,h,n,f])=>'<div class="kpi '+k+'"><h3>'+h+'</h3><div class="num">'+n+'</div><div class="foot">'+esc(f)+'</div></div>').join("");
 
-  $("#fMotiv").innerHTML = '<option value="">Alle Motive</option>'+alleMotive().map(m=>'<option'+(fMotiv===m?' selected':'')+'>'+esc(m)+'</option>').join("");
+  $("#fMotiv").innerHTML = '<option value="">Alle Motive</option>'+(view==="archiv"?alleAllgMotive():alleSpezMotive()).map(m=>'<option'+(fMotiv===m?' selected':'')+'>'+esc(m)+'</option>').join("");
   const projekte = alleProjekte();
   $("#fProjekt").style.display = view==="archiv" ? "none" : "inline-block";
   $("#fProjekt").innerHTML = '<option value="">Alle Projekte</option>'+projekte.map(p=>'<option'+(fProjekt===p?' selected':'')+'>'+esc(p)+'</option>').join("");
@@ -363,8 +370,8 @@ function zeichnen(){
     const ls = sichtbarLocations();
     b.innerHTML = ls.length ? tafelLocations(ls) : '<div class="board"><div class="blank">Noch keine Locations im Archiv. Leg oben eine an.</div></div>';
   }
-  else b.innerHTML = alleMotive().map(m=>{
-    const e = sicht.filter(a=>{const l=locOf(a);return l&&l.fields.Motiv===m;});
+  else b.innerHTML = alleSpezMotive().map(m=>{
+    const e = sicht.filter(a=>(a.fields["Motiv (Drehbuch)"]||"")===m);
     const lauf = e.filter(a=>!["Recherchiert","Absage"].includes(a.fields.Status)).length;
     return '<div style="margin-bottom:26px"><div style="display:flex;align-items:center;gap:14px;padding-bottom:11px;margin-bottom:2px;border-bottom:1px solid var(--line-2)"><h2 style="font-size:15px;font-weight:650;margin:0">'+esc(m)+'</h2><span style="font-size:12px;color:var(--txt-3)">'+(e.length?e.length+" · "+lauf+" im Gespräch":"noch nichts")+'</span></div>'+
       (e.length ? tafel(e,false) : '<div class="board"><div class="blank">Hier fehlt noch alles.</div></div>')+'</div>';
@@ -401,7 +408,7 @@ function tafelLocations(list){
 }
 
 function tafel(list, mitMotiv){
-  return '<div class="board"><table><thead><tr><th></th><th></th><th>'+(mitMotiv?"Motiv / Location":"Location")+'</th><th>Status</th><th>Adresse</th><th>Kontakt</th><th>Motivgeber</th><th>Regie</th><th>Wiedervorlage</th><th class="r">Preis</th></tr></thead><tbody>'+
+  return '<div class="board"><table><thead><tr><th></th><th>'+(mitMotiv?"Motiv / Location":"Location")+'</th><th>Status</th><th>Adresse</th><th>Kontakt</th><th>Motivgeber</th><th>Regie</th><th>Wiedervorlage</th><th class="r">Preis</th></tr></thead><tbody>'+
     list.map(a=>{
       const l = locOf(a) || {fields:{}};
       const s = st(a.fields.Status);
@@ -419,7 +426,7 @@ function tafel(list, mitMotiv){
       return '<tr data-id="'+a.id+'">'+
         '<td>'+fotoZelle+'</td>'+
         '<td><div class="name"><div class="stripe '+s.ton+'"></div><div><b>'+esc(l.fields.Name||a.fields.Titel||"ohne Namen")+'</b>'+
-        '<span>'+esc(mitMotiv?(l.fields.Motiv||""):"")+(l.fields.Website?(mitMotiv?' · ':'')+'<a href="'+esc(l.fields.Website)+'" target="_blank" style="color:var(--txt-2)">Website</a>':'')+'</span></div></div></td>'+
+        '<span>'+esc(mitMotiv?(a.fields["Motiv (Drehbuch)"]||""):"")+(l.fields.Website?(mitMotiv?' · ':'')+'<a href="'+esc(l.fields.Website)+'" target="_blank" style="color:var(--txt-2)">Website</a>':'')+'</span></div></div></td>'+
         '<td><span class="badge '+s.ton+'">'+s.label+'</span></td>'+
         '<td>'+(l.fields.Adresse?esc(l.fields.Adresse.split("\\n")[0]):'<span class="dim">—</span>')+'</td>'+
         '<td>'+[a.fields.Ansprechpartner,a.fields.Telefon||l.fields.Telefon,a.fields.Mail||l.fields.Mail].filter(Boolean).map(esc).join("<br>")+'</td>'+
@@ -450,6 +457,8 @@ function maske(a){
     '<div class="grid">'+
       f("status","STATUS")+'<select data-k="Status" id="selStatus">'+STATUS.map(s=>'<option value="'+s.id+'"'+(a.fields.Status===s.id?" selected":"")+'>'+s.label+'</option>').join("")+'</select><div class="tip" id="tipStatus">'+st(a.fields.Status||"Recherchiert").hint+'</div></div>'+
       f("projekt","PROJEKT")+'<input data-k="Projekt" list="projektListe" value="'+esc(a.fields.Projekt||"")+'" placeholder="Heiland VI"></div>'+
+      f("motivdb","MOTIV (DREHBUCH)")+'<input data-k="Motiv (Drehbuch)" list="motivDbListe" value="'+esc(a.fields["Motiv (Drehbuch)"]||"")+'" placeholder="z.B. Wohnung Linda"></div>'+
+      '<datalist id="motivDbListe">'+alleSpezMotive().map(m=>'<option value="'+esc(m)+'">').join("")+'</datalist>'+
       '<datalist id="projektListe">'+alleProjekte().map(p=>'<option value="'+esc(p)+'">').join("")+'</datalist>'+
       f("kontakt","ANSPRECHPARTNER")+'<input data-k="Ansprechpartner" value="'+esc(a.fields.Ansprechpartner||"")+'"></div>'+
       f("telefon","TELEFON")+'<input data-k="Telefon" value="'+esc(a.fields.Telefon||"")+'"></div>'+
@@ -486,7 +495,7 @@ function maske(a){
       if(offen._locNeu){
         b.innerHTML += '<div class="grid" style="margin-top:10px">'+
           f("nMotiv","MOTIV")+'<input id="nMotiv" list="motivListe2" value="'+esc(offen._locNeu.Motiv||"")+'" placeholder="Frei eintippen oder Vorschlag wählen"></div>'+
-          '<datalist id="motivListe2">'+alleMotive().map(m=>'<option value="'+esc(m)+'">').join("")+'</datalist>'+
+          '<datalist id="motivListe2">'+alleAllgMotive().map(m=>'<option value="'+esc(m)+'">').join("")+'</datalist>'+
           f("nEtage","ETAGE")+'<select id="nEtage"><option value="">—</option>'+ETAGEN.map(e=>'<option'+(offen._locNeu.Etage===e?" selected":"")+'>'+e+'</option>').join("")+'</select></div>'+
           f("nQm","QM")+'<input id="nQm" type="number" value="'+esc(offen._locNeu.qm||"")+'"></div>'+
           f("nAdresse","ADRESSE"," wide")+'<textarea id="nAdresse" rows="2">'+esc(offen._locNeu.Adresse||"")+'</textarea></div>'+
@@ -586,7 +595,7 @@ function maskeLocation(l){
     '<div class="grid">'+
       f("name","NAME"," wide")+'<input data-lk="Name" value="'+esc(flds.Name||"")+'" placeholder="Ballhaus Berlin"></div>'+
       f("motiv","MOTIV")+'<input data-lk="Motiv" list="motivListe" value="'+esc(flds.Motiv||"")+'" placeholder="Frei eintippen oder aus Vorschlägen wählen"></div>'+
-      '<datalist id="motivListe">'+alleMotive().map(m=>'<option value="'+esc(m)+'">').join("")+'</datalist>'+
+      '<datalist id="motivListe">'+alleAllgMotive().map(m=>'<option value="'+esc(m)+'">').join("")+'</datalist>'+
       f("etage","ETAGE")+'<select data-lk="Etage"><option value="">—</option>'+ETAGEN.map(e=>'<option'+(flds.Etage===e?" selected":"")+'>'+e+'</option>').join("")+'</select></div>'+
       f("qm","QM")+'<input data-lk="qm" type="number" value="'+esc(flds.qm||"")+'"></div>'+
       f("bezirk","BEZIRK")+'<select data-lk="Bezirk"><option value="">—</option>'+BEZIRKE.map(b=>'<option'+(flds.Bezirk===b?" selected":"")+'>'+b+'</option>').join("")+'</select></div>'+
@@ -680,11 +689,11 @@ async function loeschen(a){
 function exportAufnahmeleiter(){
   const kandidaten = anfragen.filter(a=>a.fields.Status==="Gebucht" && !a.fields["An Aufnahmeleiter gesendet"]);
   if(!kandidaten.length){ warn('Nichts zu exportieren — alle „Ausgesucht"-Anfragen wurden bereits als gesendet markiert.'); return; }
-  const sp=["Name","Motiv","Adresse","Bezirk","Etage","qm","Ansprechpartner","Telefon","Mail","Website","Fotos (Drive-Link)","Preis","Projekt","Notiz"];
+  const sp=["Motiv (Drehbuch)","Name","Adresse","Bezirk","Etage","qm","Ansprechpartner","Telefon","Mail","Website","Fotos (Drive-Link)","Preis","Projekt","Notiz"];
   const c=v=>'"'+String(v??"").replace(/"/g,'""').replace(/\n/g," ")+'"';
   const rows = kandidaten.map(a=>{
     const l = locOf(a)||{fields:{}};
-    return [l.fields.Name,l.fields.Motiv,l.fields.Adresse,l.fields.Bezirk,l.fields.Etage,l.fields.qm,
+    return [a.fields["Motiv (Drehbuch)"],l.fields.Name,l.fields.Adresse,l.fields.Bezirk,l.fields.Etage,l.fields.qm,
       a.fields.Ansprechpartner||l.fields.Ansprechpartner,a.fields.Telefon||l.fields.Telefon,a.fields.Mail||l.fields.Mail,
       l.fields.Website,l.fields["Fotos (Drive-Link)"],a.fields.Preis,a.fields.Projekt,a.fields.Notiz].map(c).join(";");
   });
@@ -693,9 +702,9 @@ function exportAufnahmeleiter(){
   warn("");
 }
 function csv(){
-  const sp=["Location","Motiv","Adresse","Website","qm","Etage","Projekt","Status","Ansprechpartner","Telefon","Mail","Angefragt am","Kanal","Wiedervorlage","Preis","Notiz","Von"];
+  const sp=["Motiv (Drehbuch)","Location","Motiv (allgemein)","Adresse","Website","qm","Etage","Projekt","Status","Ansprechpartner","Telefon","Mail","Angefragt am","Kanal","Wiedervorlage","Preis","Notiz","Von"];
   const c=v=>'"'+String(v??"").replace(/"/g,'""').replace(/\n/g," ")+'"';
-  const rows = anfragen.map(a=>{const l=locOf(a)||{fields:{}};return [l.fields.Name,l.fields.Motiv,l.fields.Adresse,l.fields.Website,l.fields.qm,l.fields.Etage,a.fields.Projekt,a.fields.Status,a.fields.Ansprechpartner,a.fields.Telefon,a.fields.Mail,a.fields["Angefragt am"],a.fields.Kanal,a.fields.Wiedervorlage,a.fields.Preis,a.fields.Notiz,a.fields.Von].map(c).join(";");});
+  const rows = anfragen.map(a=>{const l=locOf(a)||{fields:{}};return [a.fields["Motiv (Drehbuch)"],l.fields.Name,l.fields.Motiv,l.fields.Adresse,l.fields.Website,l.fields.qm,l.fields.Etage,a.fields.Projekt,a.fields.Status,a.fields.Ansprechpartner,a.fields.Telefon,a.fields.Mail,a.fields["Angefragt am"],a.fields.Kanal,a.fields.Wiedervorlage,a.fields.Preis,a.fields.Notiz,a.fields.Von].map(c).join(";");});
   const blob = new Blob(["\uFEFF"+[sp.map(c).join(";"),...rows].join("\n")],{type:"text/csv;charset=utf-8"});
   const link=document.createElement("a"); link.href=URL.createObjectURL(blob); link.download="anfragen_"+heute()+".csv"; link.click();
 }
@@ -738,7 +747,7 @@ function filterMaske(){
 
 document.addEventListener("click", ev=>{
   const w = ev.target.closest("[data-wer]"); if(w){ wer=w.dataset.wer; return zeichnen(); }
-  const p = ev.target.closest(".pill[data-view]"); if(p){ view=p.dataset.view; return zeichnen(); }
+  const p = ev.target.closest(".pill[data-view]"); if(p){ const warArchiv=view==="archiv"; view=p.dataset.view; if(warArchiv!==(view==="archiv")) fMotiv=""; return zeichnen(); }
   const tr = ev.target.closest("tr[data-id]"); if(tr){ const it=anfragen.find(a=>a.id===tr.dataset.id); if(it) maske(it); }
   const trl = ev.target.closest("tr[data-locid]"); if(trl){ const it=locations.find(l=>l.id===trl.dataset.locid); if(it) maskeLocation(it); }
 });
