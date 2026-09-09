@@ -463,8 +463,8 @@ function tafel(list, mitMotiv){
         '<td>'+(l.fields.Adresse?esc(l.fields.Adresse.split("\\n")[0]):'<span class="dim">—</span>')+'</td>'+
         '<td>'+[a.fields.Ansprechpartner,a.fields.Telefon||l.fields.Telefon,a.fields.Mail||l.fields.Mail].filter(Boolean).map(esc).join("<br>")+'</td>'+
         '<td><div style="display:flex;flex-direction:column;gap:5px">'+
-          '<div><span style="font-size:10px;color:var(--txt-3);margin-right:5px">MG</span><span class="badge '+rmTon+'">'+rm+'</span></div>'+
-          '<div><span style="font-size:10px;color:var(--txt-3);margin-right:5px">Regie</span><span class="badge '+rgTon+'">'+rg+'</span></div>'+
+          '<div style="display:flex;align-items:center"><span style="display:inline-block;width:38px;flex:none;font-size:10px;color:var(--txt-3)">MG</span><span class="badge '+rmTon+'">'+rm+'</span></div>'+
+          '<div style="display:flex;align-items:center"><span style="display:inline-block;width:38px;flex:none;font-size:10px;color:var(--txt-3)">Regie</span><span class="badge '+rgTon+'">'+rg+'</span></div>'+
         '</div></td>'+
         '<td>'+(a.fields.Wiedervorlage?(fael?'<span class="due">seit '+dt(a.fields.Wiedervorlage)+'</span>':dt(a.fields.Wiedervorlage)):'<span class="dim">—</span>')+'</td>'+
         '<td>'+(a.fields.Besichtigungstermin?dt(a.fields.Besichtigungstermin)+(a.fields.Besichtigungszeit?' um '+esc(a.fields.Besichtigungszeit):''):'<span class="dim">—</span>')+'</td>'+
