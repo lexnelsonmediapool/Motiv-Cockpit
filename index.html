@@ -140,15 +140,19 @@ td.r{text-align:right}
 
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <script>
-const TOKEN = "patTvsHc5FOQHpIj8.e8a3f7c2c484ccdaa7977bc729733c7d63dde2cd3df82cc2e60c5e99e8f1dd18";
+const TOKEN = "patRjGhLKlkaJXOmU.bc33eb2db87b567a6aa1a7ff591aeafb226a498f930d31097ce32441ac6d4f5b";
 const BASE = "appkllF2qSGRuxYt1";
 const TBL_LOC = "tblNzlozaIyBXNO8p";
 const TBL_ANF = "tblAf3hMsbyq9lc0V";
 const API = "https://api.airtable.com/v0/" + BASE + "/";
 
-const MOTIVE = ["Show Außengelände","Aufenthaltsraum","Schnittraum","Präsentationsraum","Schule",
-  "Plattenbauwohnung","Krankenhaus","Büro Staatsanwältin Kraus","Restaurant Pileckis",
-  "Wohnung Linda","Wohnung Marion","Nagelstudio","Verpackungsbetrieb","Sonstiges"];
+const PROJEKT_MOTIVE = {
+  "Heiland VI": ["Show Außengelände","Aufenthaltsraum","Schnittraum","Präsentationsraum","Schule",
+    "Plattenbauwohnung","Krankenhaus","Büro Staatsanwältin Kraus","Restaurant Pileckis",
+    "Wohnung Linda","Wohnung Marion","Nagelstudio","Verpackungsbetrieb","Sonstiges"]
+};
+const STANDARD_PROJEKT = "Heiland VI";
+const MOTIVE = PROJEKT_MOTIVE[STANDARD_PROJEKT];
 const ALLG_MOTIVE = ["Wohnung","Haus","Büro","Schule","Krankenhaus","Restaurant","Ladengeschäft",
   "Außengelände","Industrie/Gewerbe","Plattenbau","Sonstiges"];
 const ETAGEN = ["EG","Hochparterre","1. OG","2. OG","3. OG+"];
@@ -174,7 +178,7 @@ function driveThumb(url, size){
   return "https://drive.google.com/thumbnail?id="+m[0]+"&sz=w"+(size||160);
 }
 function alleSpezMotive(){
-  const s = new Set(MOTIVE);
+  const s = new Set(aktiveMotivliste());
   anfragen.forEach(a=>{ if(a.fields["Motiv (Drehbuch)"]) s.add(a.fields["Motiv (Drehbuch)"]); });
   return [...s].sort((a,b)=>a.localeCompare(b,'de'));
 }
@@ -341,22 +345,28 @@ function sichtbar(){
   });
 }
 
+function aktiveMotivliste(){
+  return PROJEKT_MOTIVE[fProjekt] || PROJEKT_MOTIVE[STANDARD_PROJEKT] || MOTIVE;
+}
 function zeichnen(){
   const sicht = sichtbar(), tun = offeneListe(sicht);
-  const gebucht = anfragen.filter(a=>a.fields.Status==="Gebucht");
-  const laufend = anfragen.filter(a=>["Angefragt","Rückfrage","Besichtigung","Möglich"].includes(a.fields.Status));
-  const versorgt = MOTIVE.filter(m=>anfragen.some(a=>(a.fields["Motiv (Drehbuch)"]||"")===m && a.fields.Status!=="Absage")).length;
-  const ohne = MOTIVE.filter(m=>!anfragen.some(a=>(a.fields["Motiv (Drehbuch)"]||"")===m && a.fields.Status!=="Absage"));
+  const projektLabel = fProjekt || STANDARD_PROJEKT;
+  const aktivMotive = aktiveMotivliste();
+  const anfragenProjekt = fProjekt ? anfragen.filter(a=>(a.fields.Projekt||"")===fProjekt) : anfragen.filter(a=>(a.fields.Projekt||"")===STANDARD_PROJEKT || !a.fields.Projekt);
+  const gebucht = anfragenProjekt.filter(a=>a.fields.Status==="Gebucht");
+  const laufend = anfragenProjekt.filter(a=>["Angefragt","Rückfrage","Besichtigung","Möglich"].includes(a.fields.Status));
+  const versorgt = aktivMotive.filter(m=>anfragenProjekt.some(a=>(a.fields["Motiv (Drehbuch)"]||"")===m && a.fields.Status!=="Absage")).length;
+  const ohne = aktivMotive.filter(m=>!anfragenProjekt.some(a=>(a.fields["Motiv (Drehbuch)"]||"")===m && a.fields.Status!=="Absage"));
 
   $("#whoami").innerHTML = ["Stefan","Romy"].map(n=>'<button data-wer="'+n+'" aria-pressed="'+(wer===n)+'">'+n+'</button>').join("");
   $("#btnNeu").disabled = !wer;
   $("#btnNeuLoc").disabled = !wer;
-  $("#eyebrow").textContent = "MOTIVSUCHE · " + MOTIVE.length + " MOTIVE · AIRTABLE LIVE";
+  $("#eyebrow").textContent = "MOTIVSUCHE · " + projektLabel + " · " + aktivMotive.length + " MOTIVE · AIRTABLE LIVE";
 
   $("#kpis").innerHTML = [
-    ['a','MOTIVE VERSORGT', versorgt+'<span class="unit">von '+MOTIVE.length+'</span>', ohne.length?'Noch nichts für: '+ohne.slice(0,3).join(", ")+(ohne.length>3?" +"+(ohne.length-3):""):'Für jedes Motiv liegt etwas vor.'],
-    ['b','ZU TUN', offeneListe(anfragen).length+'<span class="unit">Anfragen</span>', 'Nicht angefragt oder Wiedervorlage überfällig.'],
-    ['c','IM GESPRÄCH', laufend.length+'<span class="unit">Anfragen</span>', 'Angefragt, in Rückfrage oder Besichtigung.'],
+    ['a','MOTIVE VERSORGT — '+projektLabel.toUpperCase(), versorgt+'<span class="unit">von '+aktivMotive.length+'</span>', ohne.length?'Noch nichts für: '+ohne.slice(0,3).join(", ")+(ohne.length>3?" +"+(ohne.length-3):""):'Für jedes Motiv liegt etwas vor.'],
+    ['b','ZU TUN', offeneListe(anfragenProjekt).length+'<span class="unit">Anfragen</span>', 'Nicht angefragt oder Wiedervorlage überfällig, nur '+projektLabel+'.'],
+    ['c','IM GESPRÄCH', laufend.length+'<span class="unit">Anfragen</span>', 'Angefragt, in Rückfrage oder Besichtigung, nur '+projektLabel+'.'],
     ['d','AUSGESUCHT', gebucht.length+'<span class="unit">Anfragen</span>', gebucht.length?gebucht.slice(0,2).map(a=>(locOf(a)||{}).fields?.Name||a.fields.Titel).join(" · "):'Noch nichts ausgesucht.'],
     ['','LOCATIONS GESAMT', locations.length+'<span class="unit">im Archiv</span>', stand?'Live aus Airtable, zuletzt geladen '+stand+'.':'Live aus Airtable.']
   ].map(([k,h,n,f])=>'<div class="kpi '+k+'"><h3>'+h+'</h3><div class="num">'+n+'</div><div class="foot">'+esc(f)+'</div></div>').join("");
