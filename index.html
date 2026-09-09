@@ -56,12 +56,13 @@ select option{background:#1a1a1a}
 .board{background:var(--card);border:1px solid var(--line);border-radius:14px;overflow-x:auto;overflow-y:hidden}
 table{width:100%;border-collapse:collapse}
 thead th{font-size:10.5px;letter-spacing:.13em;color:var(--txt-3);font-weight:600;text-align:left;padding:16px 14px;border-bottom:1px solid var(--line);white-space:nowrap}
-thead th.r{text-align:right}
+thead th.r{text-align:right;position:sticky;right:0;background:var(--card);box-shadow:-6px 0 8px -6px rgba(0,0,0,.4)}
 tbody tr{border-bottom:1px solid var(--line);cursor:pointer}
 tbody tr:last-child{border-bottom:0}
 tbody tr:hover{background:var(--card-2)}
-td{padding:14px;vertical-align:top}
-td.r{text-align:right}
+td{padding:12px 10px;vertical-align:top}
+td.r{text-align:right;position:sticky;right:0;background:var(--card);box-shadow:-6px 0 8px -6px rgba(0,0,0,.4)}
+tbody tr:hover td.r{background:var(--card-2)}
 .name{display:flex;gap:12px;align-items:flex-start;min-width:230px}
 .stripe{width:3px;align-self:stretch;min-height:34px;border-radius:2px;background:var(--c-aus);flex:none}
 .stripe.tun{background:var(--c-tun)} .stripe.lauf{background:var(--c-lauf)}
@@ -439,7 +440,7 @@ function tafelLocations(list){
 }
 
 function tafel(list, mitMotiv){
-  return '<div class="board"><table><thead><tr><th></th><th>'+(mitMotiv?"Motiv / Location":"Location")+'</th><th>Status</th><th>Adresse</th><th>Kontakt</th><th>Motivgeber</th><th>Regie</th><th>Wiedervorlage</th><th>Besichtigung</th><th class="r">Preis</th></tr></thead><tbody>'+
+  return '<div class="board"><table><thead><tr><th></th><th>'+(mitMotiv?"Motiv / Location":"Location")+'</th><th>Status</th><th>Adresse</th><th>Kontakt</th><th>Rückmeldungen</th><th>Wiedervorlage</th><th>Besichtigung</th><th class="r">Preis</th></tr></thead><tbody>'+
     list.map(a=>{
       const l = locOf(a) || {fields:{}};
       const s = st(a.fields.Status);
@@ -461,8 +462,10 @@ function tafel(list, mitMotiv){
         '<td><span class="badge '+s.ton+'">'+s.label+'</span></td>'+
         '<td>'+(l.fields.Adresse?esc(l.fields.Adresse.split("\\n")[0]):'<span class="dim">—</span>')+'</td>'+
         '<td>'+[a.fields.Ansprechpartner,a.fields.Telefon||l.fields.Telefon,a.fields.Mail||l.fields.Mail].filter(Boolean).map(esc).join("<br>")+'</td>'+
-        '<td><span class="badge '+rmTon+'">'+rm+'</span></td>'+
-        '<td><span class="badge '+rgTon+'">'+rg+'</span></td>'+
+        '<td><div style="display:flex;flex-direction:column;gap:5px">'+
+          '<div><span style="font-size:10px;color:var(--txt-3);margin-right:5px">MG</span><span class="badge '+rmTon+'">'+rm+'</span></div>'+
+          '<div><span style="font-size:10px;color:var(--txt-3);margin-right:5px">Regie</span><span class="badge '+rgTon+'">'+rg+'</span></div>'+
+        '</div></td>'+
         '<td>'+(a.fields.Wiedervorlage?(fael?'<span class="due">seit '+dt(a.fields.Wiedervorlage)+'</span>':dt(a.fields.Wiedervorlage)):'<span class="dim">—</span>')+'</td>'+
         '<td>'+(a.fields.Besichtigungstermin?dt(a.fields.Besichtigungstermin)+(a.fields.Besichtigungszeit?' um '+esc(a.fields.Besichtigungszeit):''):'<span class="dim">—</span>')+'</td>'+
         '<td class="r" style="white-space:pre-line">'+(a.fields.Preis?esc(a.fields.Preis):'<span class="dim">—</span>')+'</td></tr>';
