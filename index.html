@@ -144,15 +144,16 @@ const TOKEN = "patRjGhLKlkaJXOmU.bc33eb2db87b567a6aa1a7ff591aeafb226a498f930d310
 const BASE = "appkllF2qSGRuxYt1";
 const TBL_LOC = "tblNzlozaIyBXNO8p";
 const TBL_ANF = "tblAf3hMsbyq9lc0V";
+const TBL_PROJ = "Projekte";
 const API = "https://api.airtable.com/v0/" + BASE + "/";
 
-const PROJEKT_MOTIVE = {
-  "Heiland VI": ["Show Außengelände","Aufenthaltsraum","Schnittraum","Präsentationsraum","Schule",
-    "Plattenbauwohnung","Krankenhaus","Büro Staatsanwältin Kraus","Restaurant Pileckis",
-    "Wohnung Linda","Wohnung Marion","Nagelstudio","Verpackungsbetrieb","Sonstiges"]
-};
-const STANDARD_PROJEKT = "Heiland VI";
-const MOTIVE = PROJEKT_MOTIVE[STANDARD_PROJEKT];
+let PROJEKT_MOTIVE = {};
+const STANDARD_PROJEKT_FALLBACK = "Heiland VI";
+let STANDARD_PROJEKT = STANDARD_PROJEKT_FALLBACK;
+const MOTIVE_FALLBACK = ["Show Außengelände","Aufenthaltsraum","Schnittraum","Präsentationsraum","Schule",
+  "Plattenbauwohnung","Krankenhaus","Büro Staatsanwältin Kraus","Restaurant Pileckis",
+  "Wohnung Linda","Wohnung Marion","Nagelstudio","Verpackungsbetrieb","Sonstiges"];
+let MOTIVE = MOTIVE_FALLBACK;
 const ALLG_MOTIVE = ["Wohnung","Haus","Büro","Schule","Krankenhaus","Restaurant","Ladengeschäft",
   "Außengelände","Industrie/Gewerbe","Plattenbau","Sonstiges"];
 const ETAGEN = ["EG","Hochparterre","1. OG","2. OG","3. OG+"];
@@ -315,8 +316,19 @@ async function alle(tableId){
 
 async function laden(still){
   try{
-    const [l,a] = await Promise.all([alle(TBL_LOC), alle(TBL_ANF)]);
+    const [l,a,p] = await Promise.all([alle(TBL_LOC), alle(TBL_ANF), alle(TBL_PROJ)]);
     locations = l; anfragen = a;
+    const neuePM = {};
+    p.forEach(rec=>{
+      const name = rec.fields.Name;
+      const liste = (rec.fields.Pflichtmotive||"").split("\n").map(s=>s.trim()).filter(Boolean);
+      if(name && liste.length) neuePM[name] = liste;
+    });
+    if(Object.keys(neuePM).length){
+      PROJEKT_MOTIVE = neuePM;
+      MOTIVE = PROJEKT_MOTIVE[STANDARD_PROJEKT_FALLBACK] || PROJEKT_MOTIVE[Object.keys(PROJEKT_MOTIVE)[0]] || MOTIVE_FALLBACK;
+      STANDARD_PROJEKT = PROJEKT_MOTIVE[STANDARD_PROJEKT_FALLBACK] ? STANDARD_PROJEKT_FALLBACK : Object.keys(PROJEKT_MOTIVE)[0];
+    }
     if(!still) warn("");
     stand = new Date().toLocaleTimeString("de-DE",{hour:"2-digit",minute:"2-digit"});
   }catch(e){ warn("Airtable antwortet gerade nicht (" + e.message + "). Zuletzt geladener Stand bleibt sichtbar."); }
@@ -346,7 +358,7 @@ function sichtbar(){
 }
 
 function aktiveMotivliste(){
-  return PROJEKT_MOTIVE[fProjekt] || PROJEKT_MOTIVE[STANDARD_PROJEKT] || MOTIVE;
+  return PROJEKT_MOTIVE[fProjekt] || PROJEKT_MOTIVE[STANDARD_PROJEKT] || MOTIVE_FALLBACK;
 }
 function zeichnen(){
   const sicht = sichtbar(), tun = offeneListe(sicht);
@@ -460,6 +472,7 @@ function leerAnfrage(){ return {id:null,fields:{Status:"Recherchiert",Von:wer}};
 
 function maske(a){
   offen = JSON.parse(JSON.stringify(a));
+  offen._origFields = JSON.parse(JSON.stringify(a.fields||{}));
   offen._locId = a.id ? (locOf(a)||{}).id||null : null;
   offen._locNeu = null;
   const neu = !a.id;
@@ -705,7 +718,10 @@ async function sichern(){
       if(zielLoc){
         const nachtrag = {};
         [["Ansprechpartner","Ansprechpartner"],["Telefon","Telefon"],["Mail","Mail"]].forEach(([af,lf])=>{
-          if(!zielLoc.fields[lf] && fields[af]) nachtrag[lf] = fields[af];
+          const wertNeu = fields[af];
+          const wertUrspruenglich = (offen._origFields||{})[af];
+          const wurdeGeaendert = wertNeu && wertNeu !== wertUrspruenglich;
+          if(wurdeGeaendert && zielLoc.fields[lf] !== wertNeu) nachtrag[lf] = wertNeu;
         });
         if(Object.keys(nachtrag).length) await api(TBL_LOC, {method:"PATCH", body: JSON.stringify({records:[{id:locId, fields:nachtrag}], typecast:true})});
       }
