@@ -189,7 +189,7 @@ function alleAllgMotive(){
   return [...s].sort((a,b)=>a.localeCompare(b,'de'));
 }
 function alleProjekte(){
-  const s = new Set();
+  const s = new Set(Object.keys(PROJEKT_MOTIVE));
   anfragen.forEach(a=>{ if(a.fields.Projekt) s.add(a.fields.Projekt); });
   return [...s].sort((a,b)=>a.localeCompare(b,'de'));
 }
@@ -439,7 +439,7 @@ function tafelLocations(list){
 }
 
 function tafel(list, mitMotiv){
-  return '<div class="board"><table><thead><tr><th></th><th>'+(mitMotiv?"Motiv / Location":"Location")+'</th><th>Status</th><th>Adresse</th><th>Kontakt</th><th>Motivgeber</th><th>Regie</th><th>Wiedervorlage</th><th class="r">Preis</th></tr></thead><tbody>'+
+  return '<div class="board"><table><thead><tr><th></th><th>'+(mitMotiv?"Motiv / Location":"Location")+'</th><th>Status</th><th>Adresse</th><th>Kontakt</th><th>Motivgeber</th><th>Regie</th><th>Wiedervorlage</th><th>Besichtigung</th><th class="r">Preis</th></tr></thead><tbody>'+
     list.map(a=>{
       const l = locOf(a) || {fields:{}};
       const s = st(a.fields.Status);
@@ -464,6 +464,7 @@ function tafel(list, mitMotiv){
         '<td><span class="badge '+rmTon+'">'+rm+'</span></td>'+
         '<td><span class="badge '+rgTon+'">'+rg+'</span></td>'+
         '<td>'+(a.fields.Wiedervorlage?(fael?'<span class="due">seit '+dt(a.fields.Wiedervorlage)+'</span>':dt(a.fields.Wiedervorlage)):'<span class="dim">—</span>')+'</td>'+
+        '<td>'+(a.fields.Besichtigungstermin?dt(a.fields.Besichtigungstermin)+(a.fields.Besichtigungszeit?' um '+esc(a.fields.Besichtigungszeit):''):'<span class="dim">—</span>')+'</td>'+
         '<td class="r" style="white-space:pre-line">'+(a.fields.Preis?esc(a.fields.Preis):'<span class="dim">—</span>')+'</td></tr>';
     }).join("")+'</tbody></table></div>';
 }
@@ -499,6 +500,8 @@ function maske(a){
         f("angefragt","ANGEFRAGT AM")+'<input type="date" data-k="Angefragt am" value="'+esc(a.fields["Angefragt am"]||"")+'"></div>'+
         f("kanal","WIE")+'<select data-k="Kanal">'+KANAL.map(k=>'<option'+(a.fields.Kanal===k?" selected":"")+'>'+k+'</option>').join("")+'</select></div>'+
         f("wiedervorlage","WIEDERVORLAGE")+'<input type="date" data-k="Wiedervorlage" value="'+esc(a.fields.Wiedervorlage||"")+'"></div>'+
+        f("besichtigungam","BESICHTIGUNGSTERMIN AM")+'<input type="date" data-k="Besichtigungstermin" value="'+esc(a.fields.Besichtigungstermin||"")+'"></div>'+
+        f("besichtigungum","UM")+'<input type="time" data-k="Besichtigungszeit" value="'+esc(a.fields.Besichtigungszeit||"")+'"></div>'+
       '</div></div>'+
       f("preis","MIETE / PREIS"," wide")+'<textarea data-k="Preis" rows="3" placeholder="z.B.&#10;Drehtag: 5.000 netto&#10;Aufbautag: 2.500 netto&#10;Abbautag: 2.500 netto">'+esc(a.fields.Preis||"")+'</textarea></div>'+
       f("rueckmeldung","RÜCKMELDUNG MOTIVGEBER")+'<select data-k="Rückmeldung Motivgeber">'+["Offen","Interesse","Absage"].map(v=>'<option'+(a.fields["Rückmeldung Motivgeber"]===v?" selected":"")+'>'+v+'</option>').join("")+'</select></div>'+
@@ -753,9 +756,9 @@ function exportAufnahmeleiter(){
   warn("");
 }
 function csv(){
-  const sp=["Motiv (Drehbuch)","Location","Motiv (allgemein)","Adresse","Website","qm","Etage","Projekt","Status","Ansprechpartner","Telefon","Mail","Angefragt am","Kanal","Wiedervorlage","Preis","Notiz","Von"];
+  const sp=["Motiv (Drehbuch)","Location","Motiv (allgemein)","Adresse","Website","qm","Etage","Projekt","Status","Ansprechpartner","Telefon","Mail","Angefragt am","Kanal","Wiedervorlage","Besichtigungstermin","Besichtigungszeit","Preis","Notiz","Von"];
   const c=v=>'"'+String(v??"").replace(/"/g,'""').replace(/\n/g," ")+'"';
-  const rows = anfragen.map(a=>{const l=locOf(a)||{fields:{}};return [a.fields["Motiv (Drehbuch)"],l.fields.Name,l.fields.Motiv,l.fields.Adresse,l.fields.Website,l.fields.qm,l.fields.Etage,a.fields.Projekt,a.fields.Status,a.fields.Ansprechpartner,a.fields.Telefon,a.fields.Mail,a.fields["Angefragt am"],a.fields.Kanal,a.fields.Wiedervorlage,a.fields.Preis,a.fields.Notiz,a.fields.Von].map(c).join(";");});
+  const rows = anfragen.map(a=>{const l=locOf(a)||{fields:{}};return [a.fields["Motiv (Drehbuch)"],l.fields.Name,l.fields.Motiv,l.fields.Adresse,l.fields.Website,l.fields.qm,l.fields.Etage,a.fields.Projekt,a.fields.Status,a.fields.Ansprechpartner,a.fields.Telefon,a.fields.Mail,a.fields["Angefragt am"],a.fields.Kanal,a.fields.Wiedervorlage,a.fields.Besichtigungstermin,a.fields.Besichtigungszeit,a.fields.Preis,a.fields.Notiz,a.fields.Von].map(c).join(";");});
   const blob = new Blob(["\uFEFF"+[sp.map(c).join(";"),...rows].join("\n")],{type:"text/csv;charset=utf-8"});
   const link=document.createElement("a"); link.href=URL.createObjectURL(blob); link.download="anfragen_"+heute()+".csv"; link.click();
 }
