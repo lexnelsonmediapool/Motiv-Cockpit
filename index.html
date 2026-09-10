@@ -117,7 +117,7 @@ tbody tr:hover td.r{background:var(--card-2)}
     <div><div class="eyebrow" id="eyebrow">MOTIVSUCHE</div><h1>Wen haben wir gefragt?</h1></div>
     <div class="sp"></div>
     <button class="cta quiet" id="btnCsv">Als CSV laden</button>
-    <button class="cta quiet" id="btnExportMarkiert">Exposé für Aufnahmeleiter (<span id="exportZahl">0</span>)</button>
+    <button class="cta quiet" id="btnExportMarkiert">Übergabe-CSV für Aufnahmeleiter (<span id="exportZahl">0</span>)</button>
     <button class="cta quiet" id="btnSync">Aktualisieren</button>
     <button class="cta quiet" id="btnNeuLoc" disabled>+ Location anlegen</button>
     <button class="cta" id="btnNeu" disabled>+ Anfrage anlegen</button>
@@ -362,11 +362,17 @@ async function laden(still){
   zeichnen();
 }
 
-const offeneListe = list => list.filter(a=>{
-  if(["Gebucht","Absage"].includes(a.fields.Status)) return false;
-  if(a.fields.Status==="Recherchiert") return true;
-  return a.fields.Wiedervorlage && a.fields.Wiedervorlage <= heute();
-}).sort((x,y)=>((x.fields.Wiedervorlage||"9")<(y.fields.Wiedervorlage||"9")?-1:1));
+function zuTunGrund(a){
+  if(["Gebucht","Absage"].includes(a.fields.Status)) return null;
+  if(a.fields.Status==="Recherchiert") return "Noch nicht angefragt";
+  if(a.fields.Status==="Angefragt" && !a.fields.Wiedervorlage) return "Angefragt, aber ohne Wiedervorlage";
+  if(a.fields.Wiedervorlage && a.fields.Wiedervorlage<=heute()) return "Wiedervorlage fällig";
+  if(a.fields.Besichtigungstermin && a.fields.Besichtigungstermin<heute() && !a.fields["Besichtigt am"]) return "Besichtigung vorbei, Ergebnis fehlt";
+  if((a.fields["Rückmeldung Motivgeber"]==="Interesse" || a.fields.Status==="Möglich") && (a.fields["Entscheidung Regie"]||"Offen")==="Offen") return "Positive Rückmeldung, Regie offen";
+  return null;
+}
+const offeneListe = list => list.filter(a=>zuTunGrund(a)!==null)
+  .sort((x,y)=>((x.fields.Wiedervorlage||"9")<(y.fields.Wiedervorlage||"9")?-1:1));
 
 function sichtbar(){
   return anfragen.filter(a=>{
@@ -389,21 +395,36 @@ function aktiveMotivliste(){
 }
 function zeichnen(){
   const sicht = sichtbar(), tun = offeneListe(sicht);
-  const projektLabel = fProjekt || STANDARD_PROJEKT;
-  const aktivMotive = aktiveMotivliste();
-  const anfragenProjekt = fProjekt ? anfragen.filter(a=>(a.fields.Projekt||"")===fProjekt) : anfragen.filter(a=>(a.fields.Projekt||"")===STANDARD_PROJEKT || !a.fields.Projekt);
+  const projektLabel = fProjekt || "Alle Projekte";
+  const anfragenProjekt = fProjekt ? anfragen.filter(a=>(a.fields.Projekt||"")===fProjekt) : anfragen;
   const gebucht = anfragenProjekt.filter(a=>a.fields.Status==="Gebucht");
   const laufend = anfragenProjekt.filter(a=>["Angefragt","Rückfrage","Besichtigung","Möglich"].includes(a.fields.Status));
-  const versorgt = aktivMotive.filter(m=>anfragenProjekt.some(a=>(a.fields["Motiv (Drehbuch)"]||"")===m && a.fields.Status!=="Absage")).length;
-  const ohne = aktivMotive.filter(m=>!anfragenProjekt.some(a=>(a.fields["Motiv (Drehbuch)"]||"")===m && a.fields.Status!=="Absage"));
+  let versorgt, motivGesamt, ohne;
+  if(fProjekt){
+    const aktivMotive = aktiveMotivliste();
+    motivGesamt = aktivMotive.length;
+    versorgt = aktivMotive.filter(m=>anfragenProjekt.some(a=>(a.fields["Motiv (Drehbuch)"]||"")===m && !["Absage","Recherchiert"].includes(a.fields.Status))).length;
+    ohne = aktivMotive.filter(m=>!anfragenProjekt.some(a=>(a.fields["Motiv (Drehbuch)"]||"")===m && !["Absage","Recherchiert"].includes(a.fields.Status)));
+  } else {
+    versorgt = 0; motivGesamt = 0; ohne = [];
+    Object.keys(PROJEKT_MOTIVE).forEach(proj=>{
+      const liste = PROJEKT_MOTIVE[proj];
+      const anfProj = anfragen.filter(a=>(a.fields.Projekt||"")===proj);
+      motivGesamt += liste.length;
+      liste.forEach(m=>{
+        if(anfProj.some(a=>(a.fields["Motiv (Drehbuch)"]||"")===m && !["Absage","Recherchiert"].includes(a.fields.Status))) versorgt++;
+        else ohne.push(proj+": "+m);
+      });
+    });
+  }
 
   $("#whoami").innerHTML = ["Stefan","Romy"].map(n=>'<button data-wer="'+n+'" aria-pressed="'+(wer===n)+'">'+n+'</button>').join("");
   $("#btnNeu").disabled = !wer;
   $("#btnNeuLoc").disabled = !wer;
-  $("#eyebrow").textContent = "MOTIVSUCHE · " + projektLabel + " · " + aktivMotive.length + " MOTIVE · AIRTABLE LIVE";
+  $("#eyebrow").textContent = "MOTIVSUCHE · " + projektLabel + " · " + motivGesamt + " MOTIVE · AIRTABLE LIVE";
 
   $("#kpis").innerHTML = [
-    ['a','MOTIVE VERSORGT — '+projektLabel.toUpperCase(), versorgt+'<span class="unit">von '+aktivMotive.length+'</span>', ohne.length?'Noch nichts für: '+ohne.slice(0,3).join(", ")+(ohne.length>3?" +"+(ohne.length-3):""):'Für jedes Motiv liegt etwas vor.'],
+    ['a','MOTIVE IN BEARBEITUNG — '+projektLabel.toUpperCase(), versorgt+'<span class="unit">von '+motivGesamt+'</span>', ohne.length?'Noch nicht angefragt: '+ohne.slice(0,3).join(", ")+(ohne.length>3?" +"+(ohne.length-3):""):'Für jedes Motiv läuft mindestens eine Anfrage.'],
     ['b','ZU TUN', offeneListe(anfragenProjekt).length+'<span class="unit">Anfragen</span>', 'Nicht angefragt oder Wiedervorlage überfällig, nur '+projektLabel+'.'],
     ['c','IM GESPRÄCH', laufend.length+'<span class="unit">Anfragen</span>', 'Angefragt, in Rückfrage oder Besichtigung, nur '+projektLabel+'.'],
     ['d','AUSGESUCHT', gebucht.length+'<span class="unit">Anfragen</span>', gebucht.length?gebucht.slice(0,2).map(a=>(locOf(a)||{}).fields?.Name||a.fields.Titel).join(" · "):'Noch nichts ausgesucht.'],
@@ -492,7 +513,7 @@ function tafel(list, mitMotiv){
           '<div style="display:flex;align-items:center"><span style="display:inline-block;width:38px;flex:none;font-size:10px;color:var(--txt-3)">MG</span><span class="badge '+rmTon+'">'+rm+'</span></div>'+
           '<div style="display:flex;align-items:center"><span style="display:inline-block;width:38px;flex:none;font-size:10px;color:var(--txt-3)">Regie</span><span class="badge '+rgTon+'">'+rg+'</span></div>'+
         '</div></td>'+
-        '<td>'+(a.fields.Wiedervorlage?(fael?'<span class="due">seit '+dt(a.fields.Wiedervorlage)+'</span>':dt(a.fields.Wiedervorlage)):'<span class="dim">—</span>')+'</td>'+
+        '<td>'+(a.fields.Wiedervorlage?(fael?'<span class="due">seit '+dt(a.fields.Wiedervorlage)+'</span>':dt(a.fields.Wiedervorlage)):(zuTunGrund(a)?'<span class="due" style="font-size:12px">'+zuTunGrund(a)+'</span>':'<span class="dim">—</span>'))+'</td>'+
         '<td>'+(a.fields.Besichtigungstermin?dt(a.fields.Besichtigungstermin)+(a.fields.Besichtigungszeit?' um '+esc(a.fields.Besichtigungszeit):'')+' <a href="'+kalenderLink(a,l.fields.Name,l.fields.Adresse)+'" title="Zum Kalender hinzufügen" style="text-decoration:none">📅</a>':'<span class="dim">—</span>')+
           (a.fields["Besichtigt am"]?'<br><span style="color:var(--c-gut);font-size:12px">✓ besichtigt am '+dt(a.fields["Besichtigt am"])+'</span>':'')+'</td>'+
         '<td class="r" style="white-space:pre-line">'+(a.fields.Preis?esc(a.fields.Preis):'<span class="dim">—</span>')+'</td></tr>';
@@ -505,6 +526,7 @@ function maske(a){
   offen = JSON.parse(JSON.stringify(a));
   offen._origFields = JSON.parse(JSON.stringify(a.fields||{}));
   offen._locPatch = {};
+  offen._stammdatenOffen = false;
   offen._locId = a.id ? (locOf(a)||{}).id||null : null;
   offen._locNeu = null;
   const neu = !a.id;
@@ -553,21 +575,35 @@ function maske(a){
       if(!offen._locNeu){
         const ex = locations.find(x=>x.id===offen._locId)||{fields:{}};
         const lv = k => offen._locPatch[k]!==undefined ? offen._locPatch[k] : (ex.fields[k]||"");
-        b.innerHTML += '<div class="grid" style="margin-top:10px">'+
-          '<div class="fld wide"><label>ADRESSE DER LOCATION</label><textarea data-locedit="Adresse" rows="2">'+esc(lv("Adresse"))+'</textarea></div>'+
-          '<div class="fld"><label>MOTIV (ALLGEMEIN)</label><input data-locedit="Motiv" list="motivListeInline" value="'+esc(lv("Motiv"))+'"></div>'+
-          '<datalist id="motivListeInline">'+alleAllgMotive().map(m=>'<option value="'+esc(m)+'">').join("")+'</datalist>'+
-          '<div class="fld"><label>BEZIRK</label><select data-locedit="Bezirk"><option value="">—</option>'+BEZIRKE.map(bz=>'<option'+(lv("Bezirk")===bz?" selected":"")+'>'+bz+'</option>').join("")+'</select></div>'+
-          '<div class="fld"><label>ETAGE</label><select data-locedit="Etage"><option value="">—</option>'+ETAGEN.map(e=>'<option'+(lv("Etage")===e?" selected":"")+'>'+e+'</option>').join("")+'</select></div>'+
-          '<div class="fld"><label>QM</label><input data-locedit="qm" type="number" value="'+esc(lv("qm"))+'"></div>'+
-          '<div class="fld"><label>ZIMMER</label><input data-locedit="Zimmer" type="number" value="'+esc(lv("Zimmer"))+'"></div>'+
-          '<div class="fld"><label>ANSPRECHPARTNER (LOCATION)</label><input data-locedit="Ansprechpartner" value="'+esc(lv("Ansprechpartner"))+'"></div>'+
-          '<div class="fld"><label>TELEFON (LOCATION)</label><input data-locedit="Telefon" value="'+esc(lv("Telefon"))+'"></div>'+
-          '<div class="fld"><label>MAIL (LOCATION)</label><input data-locedit="Mail" value="'+esc(lv("Mail"))+'"></div>'+
-          '<div class="fld"><label>WEBSITE</label><input data-locedit="Website" value="'+esc(lv("Website"))+'"></div>'+
-          '<div class="fld wide"><label>NOTIZ (LOCATION)</label><textarea data-locedit="Notiz" rows="2">'+esc(lv("Notiz"))+'</textarea></div>'+
-        '</div>'+
-        '<div class="tip" style="margin-top:4px">Alle Felder hier wirken direkt auf die Location im Archiv, nicht nur auf diese eine Anfrage.</div>';
+        if(offen._stammdatenOffen){
+          b.innerHTML += '<div class="grid" style="margin-top:10px">'+
+            '<div class="fld wide"><label>ADRESSE DER LOCATION</label><textarea data-locedit="Adresse" rows="2">'+esc(lv("Adresse"))+'</textarea></div>'+
+            '<div class="fld"><label>MOTIV (ALLGEMEIN)</label><input data-locedit="Motiv" list="motivListeInline" value="'+esc(lv("Motiv"))+'"></div>'+
+            '<datalist id="motivListeInline">'+alleAllgMotive().map(m=>'<option value="'+esc(m)+'">').join("")+'</datalist>'+
+            '<div class="fld"><label>BEZIRK</label><select data-locedit="Bezirk"><option value="">—</option>'+BEZIRKE.map(bz=>'<option'+(lv("Bezirk")===bz?" selected":"")+'>'+bz+'</option>').join("")+'</select></div>'+
+            '<div class="fld"><label>ETAGE</label><select data-locedit="Etage"><option value="">—</option>'+ETAGEN.map(e=>'<option'+(lv("Etage")===e?" selected":"")+'>'+e+'</option>').join("")+'</select></div>'+
+            '<div class="fld"><label>QM</label><input data-locedit="qm" type="number" value="'+esc(lv("qm"))+'"></div>'+
+            '<div class="fld"><label>ZIMMER</label><input data-locedit="Zimmer" type="number" value="'+esc(lv("Zimmer"))+'"></div>'+
+            '<div class="fld"><label>ANSPRECHPARTNER (LOCATION)</label><input data-locedit="Ansprechpartner" value="'+esc(lv("Ansprechpartner"))+'"></div>'+
+            '<div class="fld"><label>TELEFON (LOCATION)</label><input data-locedit="Telefon" value="'+esc(lv("Telefon"))+'"></div>'+
+            '<div class="fld"><label>MAIL (LOCATION)</label><input data-locedit="Mail" value="'+esc(lv("Mail"))+'"></div>'+
+            '<div class="fld"><label>WEBSITE</label><input data-locedit="Website" value="'+esc(lv("Website"))+'"></div>'+
+            '<div class="fld wide"><label>NOTIZ (LOCATION)</label><textarea data-locedit="Notiz" rows="2">'+esc(lv("Notiz"))+'</textarea></div>'+
+          '</div>'+
+          '<div class="tip" style="margin-top:4px">Alle Felder hier wirken direkt auf die Location im Archiv, nicht nur auf diese eine Anfrage.</div>';
+        } else {
+          const zeilen = [
+            ["Adresse", lv("Adresse")], ["Motiv", lv("Motiv")], ["Bezirk", lv("Bezirk")],
+            ["Etage", lv("Etage")], ["qm", lv("qm")], ["Zimmer", lv("Zimmer")],
+            ["Ansprechpartner", lv("Ansprechpartner")], ["Telefon", lv("Telefon")], ["Mail", lv("Mail")],
+            ["Website", lv("Website")], ["Notiz", lv("Notiz")]
+          ].filter(([,v])=>v);
+          b.innerHTML += '<div class="secTitle" style="margin-top:14px">Stammdaten der Location (nur Anzeige)</div>'+
+            '<div style="border:1px solid var(--line-2);border-radius:9px;padding:12px 14px;font-size:13px;line-height:1.8">'+
+            (zeilen.length ? zeilen.map(([k,v])=>'<div><span style="color:var(--txt-3)">'+k+':</span> '+esc(v)+'</div>').join("") : '<span class="dim">Noch keine Stammdaten hinterlegt.</span>')+
+            '</div>'+
+            '<button type="button" class="cta quiet" data-stammdatenAuf style="margin-top:8px;padding:8px 16px;font-size:12.5px">Stammdaten bearbeiten</button>';
+        }
         const t = driveThumb(ex.fields["Titelfoto (Drive-Link)"],320);
         const ordId = driveOrdnerId(ex.fields["Fotos (Drive-Link)"]);
         let inhalt;
@@ -619,6 +655,7 @@ function maske(a){
     const neu = ev.target.closest("[data-neu]");
     if(neu){ offen._locNeu={Name:neu.dataset.neu, Motiv:""}; offen._locId=null; $("#locResult").innerHTML=""; $("#locSuche").value=""; $("#locSucheWrap").hidden=true; locBlockZeichnen(); return; }
     if(ev.target.closest("[data-locClear]")){ offen._locId=null; offen._locNeu=null; $("#locSucheWrap").hidden=false; $("#locSuche").value=""; $("#locSuche").focus(); locBlockZeichnen(); return; }
+    if(ev.target.closest("[data-stammdatenAuf]")){ offen._stammdatenOffen = true; locBlockZeichnen(); return; }
   });
   function eingabeHandler(ev){
     const k = ev.target.dataset.k;
