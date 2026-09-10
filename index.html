@@ -503,6 +503,7 @@ function leerAnfrage(){ return {id:null,fields:{Status:"Recherchiert",Von:wer}};
 function maske(a){
   offen = JSON.parse(JSON.stringify(a));
   offen._origFields = JSON.parse(JSON.stringify(a.fields||{}));
+  offen._locPatch = {};
   offen._locId = a.id ? (locOf(a)||{}).id||null : null;
   offen._locNeu = null;
   const neu = !a.id;
@@ -549,8 +550,22 @@ function maske(a){
       b.innerHTML = '<div class="locPicked"><span class="sp">'+(offen._locNeu?'Neu: ':'')+esc(nm)+'</span><button type="button" class="cta quiet" style="padding:6px 12px;font-size:12px" data-locClear>Ändern</button></div>';
       if(!offen._locNeu){
         const ex = locations.find(x=>x.id===offen._locId)||{fields:{}};
-        const info = [ex.fields.Adresse, ex.fields.Bezirk, [ex.fields.Ansprechpartner,ex.fields.Telefon,ex.fields.Mail].filter(Boolean).join(" · ")].filter(Boolean);
-        if(info.length) b.innerHTML += '<div class="tip" style="margin-top:8px;line-height:1.6">'+info.map(esc).join("<br>")+'</div>';
+        const lv = k => offen._locPatch[k]!==undefined ? offen._locPatch[k] : (ex.fields[k]||"");
+        b.innerHTML += '<div class="grid" style="margin-top:10px">'+
+          '<div class="fld wide"><label>ADRESSE DER LOCATION</label><textarea data-locedit="Adresse" rows="2">'+esc(lv("Adresse"))+'</textarea></div>'+
+          '<div class="fld"><label>MOTIV (ALLGEMEIN)</label><input data-locedit="Motiv" list="motivListeInline" value="'+esc(lv("Motiv"))+'"></div>'+
+          '<datalist id="motivListeInline">'+alleAllgMotive().map(m=>'<option value="'+esc(m)+'">').join("")+'</datalist>'+
+          '<div class="fld"><label>BEZIRK</label><select data-locedit="Bezirk"><option value="">—</option>'+BEZIRKE.map(bz=>'<option'+(lv("Bezirk")===bz?" selected":"")+'>'+bz+'</option>').join("")+'</select></div>'+
+          '<div class="fld"><label>ETAGE</label><select data-locedit="Etage"><option value="">—</option>'+ETAGEN.map(e=>'<option'+(lv("Etage")===e?" selected":"")+'>'+e+'</option>').join("")+'</select></div>'+
+          '<div class="fld"><label>QM</label><input data-locedit="qm" type="number" value="'+esc(lv("qm"))+'"></div>'+
+          '<div class="fld"><label>ZIMMER</label><input data-locedit="Zimmer" type="number" value="'+esc(lv("Zimmer"))+'"></div>'+
+          '<div class="fld"><label>ANSPRECHPARTNER (LOCATION)</label><input data-locedit="Ansprechpartner" value="'+esc(lv("Ansprechpartner"))+'"></div>'+
+          '<div class="fld"><label>TELEFON (LOCATION)</label><input data-locedit="Telefon" value="'+esc(lv("Telefon"))+'"></div>'+
+          '<div class="fld"><label>MAIL (LOCATION)</label><input data-locedit="Mail" value="'+esc(lv("Mail"))+'"></div>'+
+          '<div class="fld"><label>WEBSITE</label><input data-locedit="Website" value="'+esc(lv("Website"))+'"></div>'+
+          '<div class="fld wide"><label>NOTIZ (LOCATION)</label><textarea data-locedit="Notiz" rows="2">'+esc(lv("Notiz"))+'</textarea></div>'+
+        '</div>'+
+        '<div class="tip" style="margin-top:4px">Alle Felder hier wirken direkt auf die Location im Archiv, nicht nur auf diese eine Anfrage.</div>';
         const t = driveThumb(ex.fields["Titelfoto (Drive-Link)"],320);
         const ordId = driveOrdnerId(ex.fields["Fotos (Drive-Link)"]);
         let inhalt;
@@ -619,10 +634,20 @@ function maske(a){
       if(k==="Besichtigungstermin" || k==="Besichtigungszeit"){
         const box = $("#kalenderLinkBox");
         const ortName = (offen._locNeu ? offen._locNeu.Name : (locations.find(x=>x.id===offen._locId)||{}).fields?.Name) || "Location";
-        const ortAdresse = offen._locNeu ? offen._locNeu.Adresse : (locations.find(x=>x.id===offen._locId)||{}).fields?.Adresse;
+        const ortAdresse = offen._locPatch.Adresse!==undefined ? offen._locPatch.Adresse : (offen._locNeu ? offen._locNeu.Adresse : (locations.find(x=>x.id===offen._locId)||{}).fields?.Adresse);
         box.innerHTML = offen.fields.Besichtigungstermin
           ? '<a href="'+kalenderLink(offen,ortName,ortAdresse)+'" class="mini" style="text-decoration:none;display:inline-block">📅 Zum Kalender hinzufügen ↗</a>'
           : "";
+      }
+      return;
+    }
+    const le = ev.target.dataset.locedit;
+    if(le){
+      offen._locPatch[le] = ev.target.value;
+      const box = $("#kalenderLinkBox");
+      if(box && offen.fields.Besichtigungstermin){
+        const ortName = (offen._locNeu ? offen._locNeu.Name : (locations.find(x=>x.id===offen._locId)||{}).fields?.Name) || "Location";
+        box.innerHTML = '<a href="'+kalenderLink(offen,ortName,offen._locPatch.Adresse)+'" class="mini" style="text-decoration:none;display:inline-block">📅 Zum Kalender hinzufügen ↗</a>';
       }
       return;
     }
@@ -759,13 +784,16 @@ async function sichern(){
     if(!offen._locNeu){
       const zielLoc = locations.find(x=>x.id===locId);
       if(zielLoc){
-        const nachtrag = {};
+        const nachtrag = Object.assign({}, offen._locPatch||{});
         [["Ansprechpartner","Ansprechpartner"],["Telefon","Telefon"],["Mail","Mail"]].forEach(([af,lf])=>{
           const wertNeu = fields[af];
           const wertUrspruenglich = (offen._origFields||{})[af];
           const wurdeGeaendert = wertNeu && wertNeu !== wertUrspruenglich;
-          if(wurdeGeaendert && zielLoc.fields[lf] !== wertNeu) nachtrag[lf] = wertNeu;
+          if(wurdeGeaendert && zielLoc.fields[lf] !== wertNeu && nachtrag[lf]===undefined) nachtrag[lf] = wertNeu;
         });
+        if(nachtrag.qm) nachtrag.qm = Number(nachtrag.qm);
+        if(nachtrag.Zimmer) nachtrag.Zimmer = Number(nachtrag.Zimmer);
+        Object.keys(nachtrag).forEach(k=>{ if(nachtrag[k]===zielLoc.fields[k]) delete nachtrag[k]; });
         if(Object.keys(nachtrag).length) await api(TBL_LOC, {method:"PATCH", body: JSON.stringify({records:[{id:locId, fields:nachtrag}], typecast:true})});
       }
     }
