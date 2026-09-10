@@ -601,7 +601,7 @@ function maske(a){
     if(neu){ offen._locNeu={Name:neu.dataset.neu, Motiv:""}; offen._locId=null; $("#locResult").innerHTML=""; $("#locSuche").value=""; $("#locSucheWrap").hidden=true; locBlockZeichnen(); return; }
     if(ev.target.closest("[data-locClear]")){ offen._locId=null; offen._locNeu=null; $("#locSucheWrap").hidden=false; $("#locSuche").value=""; $("#locSuche").focus(); locBlockZeichnen(); return; }
   });
-  veil.addEventListener("input", ev=>{
+  function eingabeHandler(ev){
     const k = ev.target.dataset.k;
     if(k){
       offen.fields[k] = ev.target.value;
@@ -629,7 +629,9 @@ function maske(a){
         if(el) offen._locNeu[key]=el.value;
       });
     }
-  });
+  }
+  veil.addEventListener("input", eingabeHandler);
+  veil.addEventListener("change", eingabeHandler);
   veil.addEventListener("click", async ev=>{
     if(ev.target.closest("[data-x]")) return zu();
     if(ev.target.closest("[data-kill]")){ if(await loeschen(a)) zu(); }
