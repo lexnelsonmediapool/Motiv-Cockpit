@@ -118,6 +118,7 @@ tbody tr:hover td.r{background:var(--card-2)}
     <div class="sp"></div>
     <button class="cta quiet" id="btnCsv">Als CSV laden</button>
     <button class="cta quiet" id="btnExportMarkiert">Übergabe-CSV für Aufnahmeleiter (<span id="exportZahl">0</span>)</button>
+    <button class="cta quiet" id="btnExportPDF">📄 PDF-Exposé erstellen</button>
     <button class="cta quiet" id="btnSync">Aktualisieren</button>
     <button class="cta quiet" id="btnNeuLoc" disabled>+ Location anlegen</button>
     <button class="cta" id="btnNeu" disabled>+ Anfrage anlegen</button>
@@ -847,8 +848,11 @@ async function loeschen(a){
   }catch(e){ warnIn("veilAlert","Löschen fehlgeschlagen: "+e.message); return false; }
 }
 
+function exposeKandidaten(){
+  return anfragen.filter(a=>a.fields.Status==="Gebucht" && !a.fields["An Aufnahmeleiter gesendet"]);
+}
 function exportAufnahmeleiter(){
-  const kandidaten = anfragen.filter(a=>a.fields.Status==="Gebucht" && !a.fields["An Aufnahmeleiter gesendet"]);
+  const kandidaten = exposeKandidaten();
   if(!kandidaten.length){ warn('Nichts zu exportieren — alle „Ausgesucht"-Anfragen wurden bereits als gesendet markiert.'); return; }
   const sp=["Motiv (Drehbuch)","Name","Adresse","Bezirk","Etage","qm","Zimmer","Ansprechpartner","Telefon","Mail","Website","Fotos (Drive-Link)","Preis","Projekt","Notiz"];
   const c=v=>'"'+String(v??"").replace(/"/g,'""').replace(/\n/g," ")+'"';
@@ -861,6 +865,55 @@ function exportAufnahmeleiter(){
   const blob = new Blob(["\uFEFF"+[sp.map(c).join(";"),...rows].join("\n")],{type:"text/csv;charset=utf-8"});
   const link=document.createElement("a"); link.href=URL.createObjectURL(blob); link.download="expose-aufnahmeleiter_"+heute()+".csv"; link.click();
   warn("");
+}
+function exportExposePDF(){
+  const kandidaten = exposeKandidaten();
+  if(!kandidaten.length){ warn('Nichts zu exportieren — alle „Ausgesucht"-Anfragen wurden bereits als gesendet markiert.'); return; }
+  const karten = kandidaten.map(a=>{
+    const l = locOf(a)||{fields:{}};
+    const foto = driveThumb(l.fields["Titelfoto (Drive-Link)"],600);
+    const adresse = (l.fields.Adresse||"").split("\n").filter(Boolean).join("<br>");
+    return '<div class="karte">'+
+      (foto ? '<img class="foto" src="'+foto+'" alt="">' : '<div class="fotoLeer">Kein Titelfoto</div>')+
+      '<div class="inhalt">'+
+        '<h2>'+esc(l.fields.Name||"Ohne Namen")+'</h2>'+
+        '<div class="motiv">'+esc(a.fields["Motiv (Drehbuch)"]||l.fields.Motiv||"")+'</div>'+
+        '<table>'+
+          (adresse?'<tr><td>Adresse</td><td>'+adresse+'</td></tr>':'')+
+          ([l.fields.qm?l.fields.qm+" m²":"",l.fields.Zimmer?l.fields.Zimmer+" Zimmer":"",l.fields.Etage||""].filter(Boolean).length?'<tr><td>Größe</td><td>'+[l.fields.qm?l.fields.qm+" m²":"",l.fields.Zimmer?l.fields.Zimmer+" Zimmer":"",l.fields.Etage||""].filter(Boolean).join(" · ")+'</td></tr>':'')+
+          ((a.fields.Ansprechpartner||l.fields.Ansprechpartner)?'<tr><td>Ansprechpartner</td><td>'+esc(a.fields.Ansprechpartner||l.fields.Ansprechpartner)+'</td></tr>':'')+
+          ((a.fields.Telefon||l.fields.Telefon)?'<tr><td>Telefon</td><td>'+esc(a.fields.Telefon||l.fields.Telefon)+'</td></tr>':'')+
+          ((a.fields.Mail||l.fields.Mail)?'<tr><td>Mail</td><td>'+esc(a.fields.Mail||l.fields.Mail)+'</td></tr>':'')+
+          (a.fields.Preis?'<tr><td>Preis</td><td style="white-space:pre-line">'+esc(a.fields.Preis)+'</td></tr>':'')+
+          (a.fields.Projekt?'<tr><td>Projekt</td><td>'+esc(a.fields.Projekt)+'</td></tr>':'')+
+        '</table>'+
+        (a.fields.Notiz?'<div class="notiz">'+esc(a.fields.Notiz)+'</div>':'')+
+      '</div></div>';
+  }).join("");
+  const seite = '<!DOCTYPE html><html lang="de"><head><meta charset="utf-8"><title>Motiv-Exposé</title><style>'+
+    '@page{margin:18mm}'+
+    'body{font-family:ui-sans-serif,-apple-system,Helvetica,sans-serif;color:#1a1a1a;margin:0}'+
+    '.kopf{display:flex;align-items:baseline;justify-content:space-between;border-bottom:2px solid #1a1a1a;padding-bottom:12px;margin-bottom:24px}'+
+    '.kopf h1{font-size:22px;margin:0}'+
+    '.kopf .datum{font-size:12px;color:#666}'+
+    '.karte{display:flex;gap:20px;border:1px solid #ddd;border-radius:10px;padding:16px;margin-bottom:18px;break-inside:avoid;page-break-inside:avoid}'+
+    '.foto{width:220px;height:165px;object-fit:cover;border-radius:7px;flex:none}'+
+    '.fotoLeer{width:220px;height:165px;border-radius:7px;flex:none;background:#f2f2f0;display:flex;align-items:center;justify-content:center;color:#999;font-size:12px}'+
+    '.inhalt{flex:1;min-width:0}'+
+    '.inhalt h2{margin:0 0 4px;font-size:18px}'+
+    '.motiv{display:inline-block;font-size:11px;font-weight:650;letter-spacing:.03em;color:#3a6b3a;background:#e9f5e9;border-radius:99px;padding:3px 11px;margin-bottom:10px}'+
+    'table{border-collapse:collapse;font-size:13px;width:100%}'+
+    'td{padding:3px 0;vertical-align:top}'+
+    'td:first-child{color:#777;width:120px;white-space:nowrap}'+
+    '.notiz{margin-top:10px;font-size:12.5px;color:#444;background:#f7f7f5;border-radius:7px;padding:8px 10px}'+
+    '@media print{.keindruck{display:none}}'+
+    '</style></head><body>'+
+    '<div class="keindruck" style="background:#fffbe6;border:1px solid #e0d080;border-radius:8px;padding:12px 16px;margin-bottom:20px;font-size:13px;font-family:sans-serif">Zum Speichern als PDF: <b>Cmd+P</b> → als Ziel „Als PDF sichern" wählen.</div>'+
+    '<div class="kopf"><h1>LEX NELSON — Motiv-Exposé</h1><div class="datum">Stand: '+dt(heute())+'</div></div>'+
+    karten+
+    '</body></html>';
+  const blob = new Blob([seite], {type:"text/html"});
+  window.open(URL.createObjectURL(blob), "_blank");
 }
 function csv(){
   const sp=["Motiv (Drehbuch)","Location","Motiv (allgemein)","Adresse","Website","qm","Etage","Projekt","Status","Ansprechpartner","Telefon","Mail","Angefragt am","Kanal","Wiedervorlage","Besichtigungstermin","Besichtigungszeit","Besichtigt am","Preis","Notiz","Von"];
@@ -915,6 +968,7 @@ document.addEventListener("click", ev=>{
 $("#btnNeu").onclick = () => wer && maske(leerAnfrage());
 $("#btnFilter").onclick = filterMaske;
 $("#btnExportMarkiert").onclick = exportAufnahmeleiter;
+$("#btnExportPDF").onclick = exportExposePDF;
 $("#btnNeuLoc").onclick = () => wer && maskeLocation({fields:{}});
 $("#btnSync").onclick = () => laden();
 $("#btnCsv").onclick = () => view==="archiv" ? csvArchiv() : csv();
