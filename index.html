@@ -493,7 +493,8 @@ function tafel(list, mitMotiv){
           '<div style="display:flex;align-items:center"><span style="display:inline-block;width:38px;flex:none;font-size:10px;color:var(--txt-3)">Regie</span><span class="badge '+rgTon+'">'+rg+'</span></div>'+
         '</div></td>'+
         '<td>'+(a.fields.Wiedervorlage?(fael?'<span class="due">seit '+dt(a.fields.Wiedervorlage)+'</span>':dt(a.fields.Wiedervorlage)):'<span class="dim">—</span>')+'</td>'+
-        '<td>'+(a.fields.Besichtigungstermin?dt(a.fields.Besichtigungstermin)+(a.fields.Besichtigungszeit?' um '+esc(a.fields.Besichtigungszeit):'')+' <a href="'+kalenderLink(a,l.fields.Name,l.fields.Adresse)+'" title="Zum Kalender hinzufügen" style="text-decoration:none">📅</a>':'<span class="dim">—</span>')+'</td>'+
+        '<td>'+(a.fields.Besichtigungstermin?dt(a.fields.Besichtigungstermin)+(a.fields.Besichtigungszeit?' um '+esc(a.fields.Besichtigungszeit):'')+' <a href="'+kalenderLink(a,l.fields.Name,l.fields.Adresse)+'" title="Zum Kalender hinzufügen" style="text-decoration:none">📅</a>':'<span class="dim">—</span>')+
+          (a.fields["Besichtigt am"]?'<br><span style="color:var(--c-gut);font-size:12px">✓ besichtigt am '+dt(a.fields["Besichtigt am"])+'</span>':'')+'</td>'+
         '<td class="r" style="white-space:pre-line">'+(a.fields.Preis?esc(a.fields.Preis):'<span class="dim">—</span>')+'</td></tr>';
     }).join("")+'</tbody></table></div>';
 }
@@ -533,6 +534,7 @@ function maske(a){
         f("besichtigungam","BESICHTIGUNGSTERMIN AM")+'<input type="date" data-k="Besichtigungstermin" value="'+esc(a.fields.Besichtigungstermin||"")+'"></div>'+
         f("besichtigungum","UM")+'<input type="time" data-k="Besichtigungszeit" value="'+esc(a.fields.Besichtigungszeit||"")+'"></div>'+
         (a.fields.Besichtigungstermin?'<div class="fld wide" id="kalenderLinkBox"><a href="'+kalenderLink(a,l.fields.Name,l.fields.Adresse)+'" class="mini" style="text-decoration:none;display:inline-block">📅 Zum Kalender hinzufügen ↗</a></div>':'<div class="fld wide" id="kalenderLinkBox"></div>')+
+        f("besichtigt","BESICHTIGT AM")+'<input type="date" data-k="Besichtigt am" value="'+esc(a.fields["Besichtigt am"]||"")+'"><div class="tip">Selbst setzen, sobald ihr die Location tatsächlich besichtigt habt — unabhängig vom geplanten Termin oben.</div></div>'+
       '</div></div>'+
       f("preis","MIETE / PREIS"," wide")+'<textarea data-k="Preis" rows="3" placeholder="z.B.&#10;Drehtag: 5.000 netto&#10;Aufbautag: 2.500 netto&#10;Abbautag: 2.500 netto">'+esc(a.fields.Preis||"")+'</textarea></div>'+
       f("rueckmeldung","RÜCKMELDUNG MOTIVGEBER")+'<select data-k="Rückmeldung Motivgeber">'+["Offen","Interesse","Absage"].map(v=>'<option'+(a.fields["Rückmeldung Motivgeber"]===v?" selected":"")+'>'+v+'</option>').join("")+'</select></div>'+
@@ -824,9 +826,9 @@ function exportAufnahmeleiter(){
   warn("");
 }
 function csv(){
-  const sp=["Motiv (Drehbuch)","Location","Motiv (allgemein)","Adresse","Website","qm","Etage","Projekt","Status","Ansprechpartner","Telefon","Mail","Angefragt am","Kanal","Wiedervorlage","Besichtigungstermin","Besichtigungszeit","Preis","Notiz","Von"];
+  const sp=["Motiv (Drehbuch)","Location","Motiv (allgemein)","Adresse","Website","qm","Etage","Projekt","Status","Ansprechpartner","Telefon","Mail","Angefragt am","Kanal","Wiedervorlage","Besichtigungstermin","Besichtigungszeit","Besichtigt am","Preis","Notiz","Von"];
   const c=v=>'"'+String(v??"").replace(/"/g,'""').replace(/\n/g," ")+'"';
-  const rows = anfragen.map(a=>{const l=locOf(a)||{fields:{}};return [a.fields["Motiv (Drehbuch)"],l.fields.Name,l.fields.Motiv,l.fields.Adresse,l.fields.Website,l.fields.qm,l.fields.Etage,a.fields.Projekt,a.fields.Status,a.fields.Ansprechpartner,a.fields.Telefon,a.fields.Mail,a.fields["Angefragt am"],a.fields.Kanal,a.fields.Wiedervorlage,a.fields.Besichtigungstermin,a.fields.Besichtigungszeit,a.fields.Preis,a.fields.Notiz,a.fields.Von].map(c).join(";");});
+  const rows = anfragen.map(a=>{const l=locOf(a)||{fields:{}};return [a.fields["Motiv (Drehbuch)"],l.fields.Name,l.fields.Motiv,l.fields.Adresse,l.fields.Website,l.fields.qm,l.fields.Etage,a.fields.Projekt,a.fields.Status,a.fields.Ansprechpartner,a.fields.Telefon,a.fields.Mail,a.fields["Angefragt am"],a.fields.Kanal,a.fields.Wiedervorlage,a.fields.Besichtigungstermin,a.fields.Besichtigungszeit,a.fields["Besichtigt am"],a.fields.Preis,a.fields.Notiz,a.fields.Von].map(c).join(";");});
   const blob = new Blob(["\uFEFF"+[sp.map(c).join(";"),...rows].join("\n")],{type:"text/csv;charset=utf-8"});
   const link=document.createElement("a"); link.href=URL.createObjectURL(blob); link.download="anfragen_"+heute()+".csv"; link.click();
 }
