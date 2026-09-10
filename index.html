@@ -297,25 +297,21 @@ function kalenderLink(a, ortName){
   const datum = a.fields.Besichtigungstermin;
   if(!datum) return null;
   const jjjjmmtt = datum.replace(/-/g,"");
-  let dtstart, dtend, ganztags=false;
+  let range;
   if(a.fields.Besichtigungszeit && /^\d{2}:\d{2}$/.test(a.fields.Besichtigungszeit)){
     const [h,m] = a.fields.Besichtigungszeit.split(":").map(Number);
-    dtstart = jjjjmmtt+"T"+String(h).padStart(2,"0")+String(m).padStart(2,"0")+"00";
+    const start = jjjjmmtt+"T"+String(h).padStart(2,"0")+String(m).padStart(2,"0")+"00";
     let eh=h+1; if(eh>23) eh=23;
-    dtend = jjjjmmtt+"T"+String(eh).padStart(2,"0")+String(m).padStart(2,"0")+"00";
+    const end = jjjjmmtt+"T"+String(eh).padStart(2,"0")+String(m).padStart(2,"0")+"00";
+    range = start+"/"+end;
   } else {
-    ganztags = true;
     const d2 = new Date(datum); d2.setDate(d2.getDate()+1);
-    dtstart = jjjjmmtt; dtend = d2.toISOString().slice(0,10).replace(/-/g,"");
+    const naechster = d2.toISOString().slice(0,10).replace(/-/g,"");
+    range = jjjjmmtt+"/"+naechster;
   }
-  const esc2 = s => String(s||"").replace(/[,;]/g,"\\$&").replace(/\n/g,"\\n");
-  const zeilen = ["BEGIN:VCALENDAR","VERSION:2.0","BEGIN:VEVENT",
-    "SUMMARY:"+esc2("Besichtigung: "+(ortName||"Location")),
-    ganztags ? ("DTSTART;VALUE=DATE:"+dtstart) : ("DTSTART:"+dtstart),
-    ganztags ? ("DTEND;VALUE=DATE:"+dtend) : ("DTEND:"+dtend),
-    "DESCRIPTION:"+esc2("Ansprechpartner: "+(a.fields.Ansprechpartner||"—")+"\nTelefon: "+(a.fields.Telefon||"—")),
-    "END:VEVENT","END:VCALENDAR"];
-  return "data:text/calendar;charset=utf-8,"+encodeURIComponent(zeilen.join("\r\n"));
+  const titel = encodeURIComponent("Besichtigung: "+(ortName||"Location"));
+  const details = encodeURIComponent("Ansprechpartner: "+(a.fields.Ansprechpartner||"—")+"\nTelefon: "+(a.fields.Telefon||"—"));
+  return "https://calendar.google.com/calendar/render?action=TEMPLATE&text="+titel+"&dates="+range+"&details="+details;
 }
 const locOf = a => locations.find(l => (a.fields.Location||[])[0] === l.id);
 function warn(t){ $("#alert").innerHTML = t ? '<div class="alert">'+esc(t)+'</div>' : ""; }
@@ -491,7 +487,7 @@ function tafel(list, mitMotiv){
           '<div style="display:flex;align-items:center"><span style="display:inline-block;width:38px;flex:none;font-size:10px;color:var(--txt-3)">Regie</span><span class="badge '+rgTon+'">'+rg+'</span></div>'+
         '</div></td>'+
         '<td>'+(a.fields.Wiedervorlage?(fael?'<span class="due">seit '+dt(a.fields.Wiedervorlage)+'</span>':dt(a.fields.Wiedervorlage)):'<span class="dim">—</span>')+'</td>'+
-        '<td>'+(a.fields.Besichtigungstermin?dt(a.fields.Besichtigungstermin)+(a.fields.Besichtigungszeit?' um '+esc(a.fields.Besichtigungszeit):'')+' <a href="'+kalenderLink(a,l.fields.Name)+'" title="Zum Kalender hinzufügen" style="text-decoration:none">📅</a>':'<span class="dim">—</span>')+'</td>'+
+        '<td>'+(a.fields.Besichtigungstermin?dt(a.fields.Besichtigungstermin)+(a.fields.Besichtigungszeit?' um '+esc(a.fields.Besichtigungszeit):'')+' <a href="'+kalenderLink(a,l.fields.Name)+'" target="_blank" rel="noopener" title="Zum Kalender hinzufügen" style="text-decoration:none">📅</a>':'<span class="dim">—</span>')+'</td>'+
         '<td class="r" style="white-space:pre-line">'+(a.fields.Preis?esc(a.fields.Preis):'<span class="dim">—</span>')+'</td></tr>';
     }).join("")+'</tbody></table></div>';
 }
@@ -529,7 +525,7 @@ function maske(a){
         f("wiedervorlage","WIEDERVORLAGE")+'<input type="date" data-k="Wiedervorlage" value="'+esc(a.fields.Wiedervorlage||"")+'"></div>'+
         f("besichtigungam","BESICHTIGUNGSTERMIN AM")+'<input type="date" data-k="Besichtigungstermin" value="'+esc(a.fields.Besichtigungstermin||"")+'"></div>'+
         f("besichtigungum","UM")+'<input type="time" data-k="Besichtigungszeit" value="'+esc(a.fields.Besichtigungszeit||"")+'"></div>'+
-        (a.fields.Besichtigungstermin?'<div class="fld wide" id="kalenderLinkBox"><a href="'+kalenderLink(a,l.fields.Name)+'" class="mini" style="text-decoration:none;display:inline-block">📅 Zum Kalender hinzufügen ↗</a></div>':'<div class="fld wide" id="kalenderLinkBox"></div>')+
+        (a.fields.Besichtigungstermin?'<div class="fld wide" id="kalenderLinkBox"><a href="'+kalenderLink(a,l.fields.Name)+'" target="_blank" rel="noopener" class="mini" style="text-decoration:none;display:inline-block">📅 Zum Kalender hinzufügen ↗</a></div>':'<div class="fld wide" id="kalenderLinkBox"></div>')+
       '</div></div>'+
       f("preis","MIETE / PREIS"," wide")+'<textarea data-k="Preis" rows="3" placeholder="z.B.&#10;Drehtag: 5.000 netto&#10;Aufbautag: 2.500 netto&#10;Abbautag: 2.500 netto">'+esc(a.fields.Preis||"")+'</textarea></div>'+
       f("rueckmeldung","RÜCKMELDUNG MOTIVGEBER")+'<select data-k="Rückmeldung Motivgeber">'+["Offen","Interesse","Absage"].map(v=>'<option'+(a.fields["Rückmeldung Motivgeber"]===v?" selected":"")+'>'+v+'</option>').join("")+'</select></div>'+
@@ -618,7 +614,7 @@ function maske(a){
         const box = $("#kalenderLinkBox");
         const ortName = (offen._locNeu ? offen._locNeu.Name : (locations.find(x=>x.id===offen._locId)||{}).fields?.Name) || "Location";
         box.innerHTML = offen.fields.Besichtigungstermin
-          ? '<a href="'+kalenderLink(offen,ortName)+'" class="mini" style="text-decoration:none;display:inline-block">📅 Zum Kalender hinzufügen ↗</a>'
+          ? '<a href="'+kalenderLink(offen,ortName)+'" target="_blank" rel="noopener" class="mini" style="text-decoration:none;display:inline-block">📅 Zum Kalender hinzufügen ↗</a>'
           : "";
       }
       return;
