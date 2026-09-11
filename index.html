@@ -565,7 +565,7 @@ function maske(a){
       f("gesendet","AN AUFNAHMELEITER GESENDET")+'<input type="date" data-k="An Aufnahmeleiter gesendet" value="'+esc(a.fields["An Aufnahmeleiter gesendet"]||"")+'"><div class="tip">Selbst setzen, sobald diese Anfrage tatsächlich verschickt wurde — taucht danach nicht mehr im Export auf.</div></div>'+
       f("notiz","WAS WURDE GESAGT"," wide")+'<textarea data-k="Notiz" rows="4">'+esc(a.fields.Notiz||"")+'</textarea></div>'+
     '</div>'+
-    '<div class="acts">'+(neu?"":'<button class="kill" data-kill>Löschen</button>')+'<div class="sp"></div><button class="cta quiet" data-x>Abbrechen</button><button class="cta" data-save>'+(neu?"Anlegen":"Sichern")+'</button></div>'+
+    '<div class="acts">'+(neu?"":'<button class="kill" data-kill>Löschen</button><button type="button" class="cta quiet" data-expose>📄 Exposé</button>')+'<div class="sp"></div><button class="cta quiet" data-x>Abbrechen</button><button class="cta" data-save>'+(neu?"Anlegen":"Sichern")+'</button></div>'+
    '</div></div>');
 
   function locBlockZeichnen(){
@@ -703,6 +703,7 @@ function maske(a){
   veil.addEventListener("click", async ev=>{
     if(ev.target.closest("[data-x]")) return zu();
     if(ev.target.closest("[data-kill]")){ if(await loeschen(a)) zu(); }
+    if(ev.target.closest("[data-expose]")){ exportExposeEinzeln(a); }
     if(ev.target.closest("[data-save]")){
       if(!offen._locId && !offen._locNeu){ $("#locSuche").focus(); warnIn("veilAlert","Bitte erst eine Location wählen oder neu anlegen."); return; }
       if(await sichern()) zu();
@@ -866,53 +867,103 @@ function exportAufnahmeleiter(){
   const link=document.createElement("a"); link.href=URL.createObjectURL(blob); link.download="expose-aufnahmeleiter_"+heute()+".csv"; link.click();
   warn("");
 }
+function exposeStyleBlock(){
+  return '@page{margin:0}'+
+    ':root{--bg:#f5f4ee;--ink:#1a1a1b;--dim:#8a897f;--lime:#c8e83a;--oliveA:#5c6349;--oliveB:#1c1e16;--line:#e2e0d5;--graybox:#eeede6}'+
+    '*{box-sizing:border-box}'+
+    'body{font-family:ui-sans-serif,-apple-system,Inter,Helvetica,sans-serif;color:var(--ink);margin:0;background:#e9e8e1}'+
+    '.seite{width:794px;min-height:1123px;margin:0 auto;background:var(--bg);padding:56px 64px;position:relative;break-after:page;page-break-after:always}'+
+    '.seite:last-child{break-after:auto;page-break-after:auto}'+
+    '.kopf{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:34px}'+
+    '.logoWrap{display:flex;align-items:center;gap:12px}'+
+    '.logo{width:64px;height:64px;border-radius:50%;background:radial-gradient(circle at 50% 50%,#111 55%,transparent 56%),repeating-radial-gradient(circle at 50% 50%,#bcd9ea 0 1.4px,transparent 1.4px 6px);display:flex;align-items:center;justify-content:center;flex:none}'+
+    '.logo span{color:#fff;font-size:6.5px;font-weight:700;letter-spacing:.02em;text-align:center;line-height:1.3;width:40px}'+
+    '.kopfRecht{text-align:right}'+
+    '.kopfRecht .lab{font-size:10.5px;font-weight:700;letter-spacing:.12em;color:var(--dim)}'+
+    '.kopfRecht .bar{height:3px;width:52px;background:var(--lime);margin:6px 0 0 auto}'+
+    '.lab{font-size:10.5px;font-weight:700;letter-spacing:.12em;color:var(--dim);text-transform:uppercase}'+
+    'h1{font-size:29px;margin:6px 0 26px;letter-spacing:-.01em}'+
+    '.motivWert{font-size:16px;font-weight:600;margin:6px 0 26px}'+
+    '.grafik{width:100%;height:260px;border-radius:2px;object-fit:cover;display:block;margin-bottom:4px}'+
+    '.grafikLeer{width:100%;height:260px;border-radius:2px;margin-bottom:4px;position:relative;overflow:hidden;'+
+      'background:linear-gradient(115deg,var(--oliveA) 0%,var(--oliveA) 46%,var(--oliveB) 47%,var(--oliveB) 100%)}'+
+    '.grafikLeer::before{content:"";position:absolute;left:6%;top:30%;width:52%;height:40%;'+
+      'background-image:repeating-linear-gradient(90deg,#141410 0 18px,transparent 18px 42px);opacity:.9}'+
+    '.grafikLeer::after{content:"";position:absolute;right:-4%;top:-10%;width:60%;height:130%;'+
+      'background-image:repeating-linear-gradient(115deg,transparent 0 26px,rgba(255,255,255,.18) 26px 27px);'+
+      'background-color:#0c0d09}'+
+    '.grafikBalken{height:5px;background:var(--lime);width:38%;margin-bottom:34px}'+
+    '.reihe{display:flex;gap:48px;margin-bottom:26px}'+
+    '.reihe>div{flex:1}'+
+    '.wert{font-size:14.5px;line-height:1.6;margin-top:6px}'+
+    '.kontaktName{font-size:14.5px;font-weight:700;margin-top:6px}'+
+    '.kontaktZeile{font-size:13px;color:var(--dim);margin-top:2px}'+
+    'hr{border:none;border-top:1px solid var(--line);margin:28px 0}'+
+    '.preisWert{font-size:16px;font-weight:700;margin-top:6px}'+
+    '.preisNeben{font-size:12.5px;color:var(--dim);margin-top:3px}'+
+    '.gesagtBox{background:var(--graybox);border-radius:10px;padding:18px 20px;margin-top:22px}'+
+    '.gesagtBox .lab{margin-bottom:8px;display:block}'+
+    '.gesagtBox p{font-size:13.5px;line-height:1.6;margin:0;color:#3a3a37}'+
+    '.fuss{position:absolute;left:64px;right:64px;bottom:36px;display:flex;justify-content:space-between;'+
+      'font-size:10.5px;font-weight:700;letter-spacing:.1em;color:var(--dim);text-transform:uppercase}'+
+    '@media print{body{background:#fff}.seite{box-shadow:none;margin:0}.keindruck{display:none}}';
+}
+function exposeSeiteHtml(a){
+  const l = locOf(a)||{fields:{}};
+  const foto = driveThumb(l.fields["Titelfoto (Drive-Link)"],900);
+  const adresse = (l.fields.Adresse||"").split("\n").filter(Boolean).join("<br>");
+  const kontaktName = a.fields.Ansprechpartner||l.fields.Ansprechpartner||"";
+  const kontaktZeile = [a.fields.Telefon||l.fields.Telefon, a.fields.Mail||l.fields.Mail].filter(Boolean).join(" | ");
+  const preisZeilen = (a.fields.Preis||"").split("\n").filter(Boolean);
+  const preisHaupt = preisZeilen[0]||"";
+  const preisNeben = preisZeilen.slice(1).join(" | ");
+  return '<div class="seite">'+
+    '<div class="kopf">'+
+      '<div class="logoWrap"><div class="logo"><span>LEX NELSON mediapool</span></div></div>'+
+      '<div class="kopfRecht"><div class="lab">Motivexpose</div><div class="bar"></div></div>'+
+    '</div>'+
+    '<div class="lab">Name</div><h1>'+esc(l.fields.Name||"Ohne Namen")+'</h1>'+
+    '<div class="lab">Motiv</div><div class="motivWert">'+esc(a.fields["Motiv (Drehbuch)"]||l.fields.Motiv||"—")+'</div>'+
+    (foto ? '<img class="grafik" src="'+foto+'" alt="">' : '<div class="grafikLeer"></div>')+
+    '<div class="grafikBalken"></div>'+
+    '<div class="reihe">'+
+      '<div><div class="lab">Adresse</div><div class="wert">'+(adresse||"—")+'</div></div>'+
+      '<div><div class="lab">Kontakt</div>'+
+        (kontaktName?'<div class="kontaktName">'+esc(kontaktName)+'</div>':'<div class="wert">—</div>')+
+        (kontaktZeile?'<div class="kontaktZeile">'+esc(kontaktZeile)+'</div>':'')+
+      '</div>'+
+    '</div>'+
+    '<hr>'+
+    '<div class="lab">Miete / Preis</div>'+
+    (preisHaupt?'<div class="preisWert">'+esc(preisHaupt)+'</div>':'<div class="preisWert">—</div>')+
+    (preisNeben?'<div class="preisNeben">'+esc(preisNeben)+'</div>':'')+
+    (a.fields.Notiz?'<div class="gesagtBox"><span class="lab">Was wurde gesagt?</span><p>'+esc(a.fields.Notiz)+'</p></div>':'')+
+    '<div class="fuss"><span>Motiv Cockpit</span><span>Stand '+dt(heute())+'</span></div>'+
+  '</div>';
+}
+function exportExposeEinzeln(a){
+  const l = locOf(a);
+  if(!l){ warn('Diese Anfrage hat noch keine Location zugeordnet.'); return; }
+  const seite = '<!DOCTYPE html><html lang="de"><head><meta charset="utf-8"><title>Motiv-Exposé — '+esc(l.fields.Name||"")+'</title><style>'+
+    exposeStyleBlock()+
+    '</style></head><body>'+
+    '<div class="keindruck" style="background:#fffbe6;border:1px solid #e0d080;border-radius:8px;padding:12px 16px;margin:16px auto;max-width:794px;font-size:13px;font-family:sans-serif">Zum Speichern als PDF: <b>Cmd+P</b> → als Ziel „Als PDF sichern" wählen.</div>'+
+    exposeSeiteHtml(a)+
+    '</body></html>';
+  const blob = new Blob([seite], {type:"text/html"});
+  window.open(URL.createObjectURL(blob), "_blank");
+}
 function exportExposePDF(){
   const kandidaten = exposeKandidaten();
   if(!kandidaten.length){ warn('Nichts zu exportieren — alle „Ausgesucht"-Anfragen wurden bereits als gesendet markiert.'); return; }
-  const karten = kandidaten.map(a=>{
-    const l = locOf(a)||{fields:{}};
-    const foto = driveThumb(l.fields["Titelfoto (Drive-Link)"],600);
-    const adresse = (l.fields.Adresse||"").split("\n").filter(Boolean).join("<br>");
-    return '<div class="karte">'+
-      (foto ? '<img class="foto" src="'+foto+'" alt="">' : '<div class="fotoLeer">Kein Titelfoto</div>')+
-      '<div class="inhalt">'+
-        '<h2>'+esc(l.fields.Name||"Ohne Namen")+'</h2>'+
-        '<div class="motiv">'+esc(a.fields["Motiv (Drehbuch)"]||l.fields.Motiv||"")+'</div>'+
-        '<table>'+
-          (adresse?'<tr><td>Adresse</td><td>'+adresse+'</td></tr>':'')+
-          ([l.fields.qm?l.fields.qm+" m²":"",l.fields.Zimmer?l.fields.Zimmer+" Zimmer":"",l.fields.Etage||""].filter(Boolean).length?'<tr><td>Größe</td><td>'+[l.fields.qm?l.fields.qm+" m²":"",l.fields.Zimmer?l.fields.Zimmer+" Zimmer":"",l.fields.Etage||""].filter(Boolean).join(" · ")+'</td></tr>':'')+
-          ((a.fields.Ansprechpartner||l.fields.Ansprechpartner)?'<tr><td>Ansprechpartner</td><td>'+esc(a.fields.Ansprechpartner||l.fields.Ansprechpartner)+'</td></tr>':'')+
-          ((a.fields.Telefon||l.fields.Telefon)?'<tr><td>Telefon</td><td>'+esc(a.fields.Telefon||l.fields.Telefon)+'</td></tr>':'')+
-          ((a.fields.Mail||l.fields.Mail)?'<tr><td>Mail</td><td>'+esc(a.fields.Mail||l.fields.Mail)+'</td></tr>':'')+
-          (a.fields.Preis?'<tr><td>Preis</td><td style="white-space:pre-line">'+esc(a.fields.Preis)+'</td></tr>':'')+
-          (a.fields.Projekt?'<tr><td>Projekt</td><td>'+esc(a.fields.Projekt)+'</td></tr>':'')+
-        '</table>'+
-        (a.fields.Notiz?'<div class="notiz">'+esc(a.fields.Notiz)+'</div>':'')+
-      '</div></div>';
-  }).join("");
-  const seite = '<!DOCTYPE html><html lang="de"><head><meta charset="utf-8"><title>Motiv-Exposé</title><style>'+
-    '@page{margin:18mm}'+
-    'body{font-family:ui-sans-serif,-apple-system,Helvetica,sans-serif;color:#1a1a1a;margin:0}'+
-    '.kopf{display:flex;align-items:baseline;justify-content:space-between;border-bottom:2px solid #1a1a1a;padding-bottom:12px;margin-bottom:24px}'+
-    '.kopf h1{font-size:22px;margin:0}'+
-    '.kopf .datum{font-size:12px;color:#666}'+
-    '.karte{display:flex;gap:20px;border:1px solid #ddd;border-radius:10px;padding:16px;margin-bottom:18px;break-inside:avoid;page-break-inside:avoid}'+
-    '.foto{width:220px;height:165px;object-fit:cover;border-radius:7px;flex:none}'+
-    '.fotoLeer{width:220px;height:165px;border-radius:7px;flex:none;background:#f2f2f0;display:flex;align-items:center;justify-content:center;color:#999;font-size:12px}'+
-    '.inhalt{flex:1;min-width:0}'+
-    '.inhalt h2{margin:0 0 4px;font-size:18px}'+
-    '.motiv{display:inline-block;font-size:11px;font-weight:650;letter-spacing:.03em;color:#3a6b3a;background:#e9f5e9;border-radius:99px;padding:3px 11px;margin-bottom:10px}'+
-    'table{border-collapse:collapse;font-size:13px;width:100%}'+
-    'td{padding:3px 0;vertical-align:top}'+
-    'td:first-child{color:#777;width:120px;white-space:nowrap}'+
-    '.notiz{margin-top:10px;font-size:12.5px;color:#444;background:#f7f7f5;border-radius:7px;padding:8px 10px}'+
-    '@media print{.keindruck{display:none}}'+
+  const seiten = kandidaten.map(exposeSeiteHtml).join("");
+  const doc = '<!DOCTYPE html><html lang="de"><head><meta charset="utf-8"><title>Motiv-Exposé</title><style>'+
+    exposeStyleBlock()+
     '</style></head><body>'+
-    '<div class="keindruck" style="background:#fffbe6;border:1px solid #e0d080;border-radius:8px;padding:12px 16px;margin-bottom:20px;font-size:13px;font-family:sans-serif">Zum Speichern als PDF: <b>Cmd+P</b> → als Ziel „Als PDF sichern" wählen.</div>'+
-    '<div class="kopf"><h1>LEX NELSON — Motiv-Exposé</h1><div class="datum">Stand: '+dt(heute())+'</div></div>'+
-    karten+
+    '<div class="keindruck" style="background:#fffbe6;border:1px solid #e0d080;border-radius:8px;padding:12px 16px;margin:16px auto;max-width:794px;font-size:13px;font-family:sans-serif">Zum Speichern als PDF: <b>Cmd+P</b> → als Ziel „Als PDF sichern" wählen — jedes Motiv liegt auf einer eigenen Seite.</div>'+
+    seiten+
     '</body></html>';
-  const blob = new Blob([seite], {type:"text/html"});
+  const blob = new Blob([doc], {type:"text/html"});
   window.open(URL.createObjectURL(blob), "_blank");
 }
 function csv(){
