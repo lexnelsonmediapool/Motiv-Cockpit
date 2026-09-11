@@ -99,6 +99,7 @@ tbody tr:hover td.r{background:var(--card-2)}
 .kill{border:1px solid rgba(255,107,74,.4);background:none;color:var(--c-tun);font:inherit;font-size:13.5px;padding:12px 20px;border-radius:99px;cursor:pointer}
 .note{font-size:12.5px;color:var(--txt-3);padding:16px 2px 0;line-height:1.6}
 .alert{border:1px solid rgba(255,107,74,.4);background:rgba(255,107,74,.08);color:#ffb9a5;border-radius:12px;padding:13px 16px;font-size:13px;line-height:1.55;margin-bottom:16px}
+.alert.gut{border-color:rgba(74,211,160,.4);background:rgba(74,211,160,.08);color:#8fe9c9}
 .secTitle{font-size:11px;letter-spacing:.13em;color:var(--txt-3);font-weight:650;margin:20px 0 10px;text-transform:uppercase}
 .locResult{border:1px solid var(--line-2);border-radius:9px;overflow:hidden;margin-top:6px;max-height:160px;overflow-y:auto}
 .locResult div{padding:9px 12px;font-size:13px;cursor:pointer;border-bottom:1px solid var(--line)}
@@ -328,6 +329,7 @@ function kalenderLink(a, ortName, adresse){
 }
 const locOf = a => locations.find(l => (a.fields.Location||[])[0] === l.id);
 function warn(t){ $("#alert").innerHTML = t ? '<div class="alert">'+esc(t)+'</div>' : ""; }
+function meldeGut(t){ $("#alert").innerHTML = '<div class="alert gut">'+esc(t)+'</div>'; setTimeout(()=>{ if($("#alert").innerHTML.includes(esc(t))) $("#alert").innerHTML=""; }, 2500); }
 function warnIn(id, t){
   const el = document.getElementById(id);
   if(el) el.innerHTML = t ? '<div class="alert">'+esc(t)+'</div>' : "";
@@ -363,8 +365,8 @@ async function laden(still){
       MOTIVE = PROJEKT_MOTIVE[STANDARD_PROJEKT_FALLBACK] || PROJEKT_MOTIVE[Object.keys(PROJEKT_MOTIVE)[0]] || MOTIVE_FALLBACK;
       STANDARD_PROJEKT = PROJEKT_MOTIVE[STANDARD_PROJEKT_FALLBACK] ? STANDARD_PROJEKT_FALLBACK : Object.keys(PROJEKT_MOTIVE)[0];
     }
-    if(!still) warn("");
     stand = new Date().toLocaleTimeString("de-DE",{hour:"2-digit",minute:"2-digit"});
+    if(!still){ warn(""); meldeGut("Aktualisiert um "+stand+" — "+l.length+" Locations, "+a.length+" Anfragen geladen."); }
   }catch(e){ warn("Airtable antwortet gerade nicht (" + e.message + "). Zuletzt geladener Stand bleibt sichtbar."); }
   zeichnen();
 }
@@ -435,6 +437,8 @@ function zeichnen(){
   $("#whoami").innerHTML = ["Stefan","Romy"].map(n=>'<button data-wer="'+n+'" aria-pressed="'+(wer===n)+'">'+n+'</button>').join("");
   $("#btnNeu").disabled = !wer;
   $("#btnNeuLoc").disabled = !wer;
+  $("#btnNeu").style.display = view==="archiv" ? "none" : "";
+  $("#btnNeuLoc").style.display = view==="archiv" ? "" : "none";
   $("#eyebrow").textContent = view==="archiv" ? ("LOCATION-ARCHIV · " + locations.length + " LOCATIONS · AIRTABLE LIVE") : ("MOTIVSUCHE · " + projektLabel + " · " + motivGesamt + " MOTIVE · AIRTABLE LIVE");
   $("#eyebrow").style.color = view==="archiv" ? "var(--arch)" : "";
   $("#h1title").textContent = view==="archiv" ? "Archiv" : "Motivsuche";
@@ -1036,7 +1040,11 @@ $("#btnFilter").onclick = filterMaske;
 $("#btnExportMarkiert").onclick = exportAufnahmeleiter;
 $("#btnExportPDF").onclick = exportExposePDF;
 $("#btnNeuLoc").onclick = () => wer && maskeLocation({fields:{}});
-$("#btnSync").onclick = () => laden();
+$("#btnSync").onclick = () => {
+  const b = $("#btnSync");
+  b.disabled = true; const alt = b.textContent; b.textContent = "Lädt …";
+  laden().finally(()=>{ b.disabled = false; b.textContent = alt; });
+};
 $("#btnCsv").onclick = () => view==="archiv" ? csvArchiv() : csv();
 $("#suche").oninput = e => { q=e.target.value; zeichnen(); };
 $("#fMotiv").onchange = e => { fMotiv=e.target.value; zeichnen(); };
