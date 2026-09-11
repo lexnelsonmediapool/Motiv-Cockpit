@@ -8,7 +8,7 @@
 :root{
   --bg:#0d0d0d; --card:#171717; --card-2:#1e1e1e; --line:#2b2b2b; --line-2:#3a3a3a;
   --txt:#f2f2f0; --txt-2:#9a9a95; --txt-3:#6e6e69;
-  --neon:#cdf556; --neon-ink:#111;
+  --neon:#cdf556; --neon-ink:#111; --arch:#5aa9e6; --arch-ink:#0a1a26;
   --c-tun:#ff6b4a; --c-lauf:#4a7dff; --c-gut:#4ad3a0; --c-aus:#5a5a55; --c-frage:#c084fc; --c-besicht:#22c4c4;
 }
 *{box-sizing:border-box}
@@ -48,6 +48,10 @@ h1{font-size:44px;line-height:1;font-weight:700;letter-spacing:-.025em;margin:0}
 .pill:hover{color:var(--txt)}
 .pill[aria-pressed="true"]{background:var(--neon);border-color:var(--neon);color:var(--neon-ink);font-weight:650}
 .pills .sp{flex:1}
+.pillDiv{width:1px;align-self:stretch;background:var(--line-2);margin:2px 6px}
+.pill.arch{border-color:rgba(90,169,230,.4);color:var(--arch)}
+.pill.arch:hover{color:var(--arch)}
+.pill.arch[aria-pressed="true"]{background:var(--arch);border-color:var(--arch);color:var(--arch-ink);font-weight:650}
 input,select,textarea{font:inherit;font-size:13.5px;color:var(--txt);background:var(--card);border:1px solid var(--line-2);border-radius:9px;padding:9px 12px;width:100%}
 input::placeholder,textarea::placeholder{color:var(--txt-3)}
 input:focus,select:focus,textarea:focus{outline:0;border-color:var(--neon)}
@@ -115,7 +119,7 @@ tbody tr:hover td.r{background:var(--card-2)}
     <button class="cta quiet" id="btnGoogle" style="padding:9px 16px;font-size:13px">Mit Google verbinden</button>
   </div>
   <div class="head">
-    <div><div class="eyebrow" id="eyebrow">MOTIVSUCHE</div><h1>Wen haben wir gefragt?</h1></div>
+    <div><div class="eyebrow" id="eyebrow">MOTIVSUCHE</div><h1 id="h1title">Wen haben wir gefragt?</h1></div>
     <div class="sp"></div>
     <button class="cta quiet" id="btnCsv">Als CSV laden</button>
     <button class="cta quiet" id="btnExportMarkiert">Übergabe-CSV für Aufnahmeleiter (<span id="exportZahl">0</span>)</button>
@@ -130,7 +134,8 @@ tbody tr:hover td.r{background:var(--card-2)}
     <button class="pill" data-view="tun">Zu tun</button>
     <button class="pill" data-view="motive">Nach Motiv</button>
     <button class="pill" data-view="alle">Alle Anfragen</button>
-    <button class="pill" data-view="archiv">Archiv (alle Locations)</button>
+    <div class="pillDiv"></div>
+    <button class="pill arch" data-view="archiv">🗄 Archiv (alle Locations)</button>
     <div class="sp"></div>
     <select id="fProjekt" style="max-width:200px"></select>
     <input class="suche" id="suche" placeholder="Suchen">
@@ -430,7 +435,9 @@ function zeichnen(){
   $("#whoami").innerHTML = ["Stefan","Romy"].map(n=>'<button data-wer="'+n+'" aria-pressed="'+(wer===n)+'">'+n+'</button>').join("");
   $("#btnNeu").disabled = !wer;
   $("#btnNeuLoc").disabled = !wer;
-  $("#eyebrow").textContent = "MOTIVSUCHE · " + projektLabel + " · " + motivGesamt + " MOTIVE · AIRTABLE LIVE";
+  $("#eyebrow").textContent = view==="archiv" ? ("LOCATION-ARCHIV · " + locations.length + " LOCATIONS · AIRTABLE LIVE") : ("MOTIVSUCHE · " + projektLabel + " · " + motivGesamt + " MOTIVE · AIRTABLE LIVE");
+  $("#eyebrow").style.color = view==="archiv" ? "var(--arch)" : "";
+  $("#h1title").textContent = view==="archiv" ? "Archiv" : "Motivsuche";
 
   $("#kpis").innerHTML = [
     ['a','MOTIVE IN BEARBEITUNG — '+projektLabel.toUpperCase(), versorgt+'<span class="unit">von '+motivGesamt+'</span>', ohne.length?'Noch nicht angefragt: '+ohne.slice(0,3).join(", ")+(ohne.length>3?" +"+(ohne.length-3):""):'Für jedes Motiv läuft mindestens eine Anfrage.'],
