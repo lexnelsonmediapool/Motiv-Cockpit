@@ -78,7 +78,8 @@ tbody tr:hover td.r{background:var(--card-2)}
 .badge.neon{background:var(--neon);border-color:var(--neon);color:var(--neon-ink)}
 .badge.aus{color:var(--txt-3);text-decoration:line-through}
 .dim{color:var(--txt-3)}
-.due{color:var(--c-tun);font-weight:650}
+.due{font-weight:650}
+.due.tun{color:var(--c-tun)} .due.frage{color:var(--c-frage)} .due.besicht{color:var(--c-besicht)} .due.gut{color:var(--c-gut)} .due.aus{color:var(--c-aus)}
 .blank{padding:46px 20px;text-align:center;color:var(--txt-3);font-size:13.5px;line-height:1.7}
 .veil{position:fixed;inset:0;background:rgba(0,0,0,.72);z-index:50;display:flex;justify-content:center;align-items:flex-start;padding:30px 16px;overflow:auto;backdrop-filter:blur(3px)}
 .sheet{background:var(--card);border:1px solid var(--line-2);border-radius:16px;width:100%;max-width:760px;padding:26px}
@@ -372,6 +373,13 @@ function zuTunGrund(a){
   if((a.fields["Rückmeldung Motivgeber"]==="Interesse" || a.fields.Status==="Möglich") && (a.fields["Entscheidung Regie"]||"Offen")==="Offen") return "Positive Rückmeldung, Regie offen";
   return null;
 }
+function zuTunTon(grund){
+  if(grund==="Positive Rückmeldung, Regie offen") return "gut";
+  if(grund==="Noch nicht angefragt") return "aus";
+  if(grund==="Angefragt, aber ohne Wiedervorlage") return "frage";
+  if(grund==="Besichtigung vorbei, Ergebnis fehlt") return "besicht";
+  return "tun";
+}
 const offeneListe = list => list.filter(a=>zuTunGrund(a)!==null)
   .sort((x,y)=>((x.fields.Wiedervorlage||"9")<(y.fields.Wiedervorlage||"9")?-1:1));
 
@@ -514,7 +522,7 @@ function tafel(list, mitMotiv){
           '<div style="display:flex;align-items:center"><span style="display:inline-block;width:38px;flex:none;font-size:10px;color:var(--txt-3)">MG</span><span class="badge '+rmTon+'">'+rm+'</span></div>'+
           '<div style="display:flex;align-items:center"><span style="display:inline-block;width:38px;flex:none;font-size:10px;color:var(--txt-3)">Regie</span><span class="badge '+rgTon+'">'+rg+'</span></div>'+
         '</div></td>'+
-        '<td>'+(a.fields.Wiedervorlage?(fael?'<span class="due">seit '+dt(a.fields.Wiedervorlage)+'</span>':dt(a.fields.Wiedervorlage)):(zuTunGrund(a)?'<span class="due" style="font-size:12px">'+zuTunGrund(a)+'</span>':'<span class="dim">—</span>'))+'</td>'+
+        '<td>'+(a.fields.Wiedervorlage?(fael?'<span class="due tun">seit '+dt(a.fields.Wiedervorlage)+'</span>':dt(a.fields.Wiedervorlage)):(zuTunGrund(a)?'<span class="due '+zuTunTon(zuTunGrund(a))+'" style="font-size:12px">'+zuTunGrund(a)+'</span>':'<span class="dim">—</span>'))+'</td>'+
         '<td>'+(a.fields.Besichtigungstermin?dt(a.fields.Besichtigungstermin)+(a.fields.Besichtigungszeit?' um '+esc(a.fields.Besichtigungszeit):'')+' <a href="'+kalenderLink(a,l.fields.Name,l.fields.Adresse)+'" title="Zum Kalender hinzufügen" style="text-decoration:none">📅</a>':'<span class="dim">—</span>')+
           (a.fields["Besichtigt am"]?'<br><span style="color:var(--c-gut);font-size:12px">✓ besichtigt am '+dt(a.fields["Besichtigt am"])+'</span>':'')+'</td>'+
         '<td class="r" style="white-space:pre-line">'+(a.fields.Preis?esc(a.fields.Preis):'<span class="dim">—</span>')+'</td></tr>';
