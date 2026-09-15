@@ -456,7 +456,7 @@ function zeichnen(){
   $("#fProjekt").style.display = view==="archiv" ? "none" : "inline-block";
   $("#fProjekt").innerHTML = '<option value="">Alle Projekte</option>'+projekte.map(p=>'<option'+(fProjekt===p?' selected':'')+'>'+esc(p)+'</option>').join("");
   $("#suche").value = q;
-  const filterAktiv = fEtage||fQmMin||fQmMax||fBezirk;
+  const filterAktiv = fEtage||fQmMin||fQmMax||fBezirk||q;
   $("#filterBadge").style.display = filterAktiv ? "flex" : "none";
   document.querySelectorAll(".pill[data-view]").forEach(b=>b.setAttribute("aria-pressed", b.dataset.view===view));
   $("#btnCsv").textContent = view==="archiv" ? "Archiv als CSV laden" : "Anfragen als CSV laden";
@@ -963,11 +963,12 @@ function exposeSeiteHtml(a){
 function exportExposeEinzeln(a){
   const l = locOf(a);
   if(!l){ warn('Diese Anfrage hat noch keine Location zugeordnet.'); return; }
-  const seite = '<!DOCTYPE html><html lang="de"><head><meta charset="utf-8"><title>Motiv-Exposé — '+esc(l.fields.Name||"")+'</title><style>'+
+  const seite = '<!DOCTYPE html><html lang="de"><head><meta charset="utf-8"><title>Motiv-Expose - '+esc(l.fields.Name||"")+'</title><style>'+
     exposeStyleBlock()+
     '</style></head><body>'+
-    '<div class="keindruck" style="background:#fffbe6;border:1px solid #e0d080;border-radius:8px;padding:12px 16px;margin:16px auto;max-width:794px;font-size:13px;font-family:sans-serif">Zum Speichern als PDF: <b>Cmd+P</b> → als Ziel „Als PDF sichern" wählen.</div>'+
+    '<div class="keindruck" style="background:#fffbe6;border:1px solid #e0d080;border-radius:8px;padding:12px 16px;margin:16px auto;max-width:794px;font-size:13px;font-family:sans-serif">Der Druckdialog öffnet gleich automatisch — als Ziel „Als PDF sichern" wählen und speichern.</div>'+
     exposeSeiteHtml(a)+
+    '<script>window.addEventListener("load",function(){setTimeout(function(){window.print();},350);});<\/script>'+
     '</body></html>';
   const blob = new Blob([seite], {type:"text/html"});
   window.open(URL.createObjectURL(blob), "_blank");
@@ -976,11 +977,12 @@ function exportExposePDF(){
   const kandidaten = exposeKandidaten();
   if(!kandidaten.length){ warn('Nichts zu exportieren — alle „Ausgesucht"-Anfragen wurden bereits als gesendet markiert.'); return; }
   const seiten = kandidaten.map(exposeSeiteHtml).join("");
-  const doc = '<!DOCTYPE html><html lang="de"><head><meta charset="utf-8"><title>Motiv-Exposé</title><style>'+
+  const doc = '<!DOCTYPE html><html lang="de"><head><meta charset="utf-8"><title>Motiv-Expose</title><style>'+
     exposeStyleBlock()+
     '</style></head><body>'+
-    '<div class="keindruck" style="background:#fffbe6;border:1px solid #e0d080;border-radius:8px;padding:12px 16px;margin:16px auto;max-width:794px;font-size:13px;font-family:sans-serif">Zum Speichern als PDF: <b>Cmd+P</b> → als Ziel „Als PDF sichern" wählen — jedes Motiv liegt auf einer eigenen Seite.</div>'+
+    '<div class="keindruck" style="background:#fffbe6;border:1px solid #e0d080;border-radius:8px;padding:12px 16px;margin:16px auto;max-width:794px;font-size:13px;font-family:sans-serif">Der Druckdialog öffnet gleich automatisch — als Ziel „Als PDF sichern" wählen und speichern. Jedes Motiv liegt auf einer eigenen Seite.</div>'+
     seiten+
+    '<script>window.addEventListener("load",function(){setTimeout(function(){window.print();},350);});<\/script>'+
     '</body></html>';
   const blob = new Blob([doc], {type:"text/html"});
   window.open(URL.createObjectURL(blob), "_blank");
@@ -1031,7 +1033,7 @@ function filterMaske(){
 
 document.addEventListener("click", ev=>{
   const w = ev.target.closest("[data-wer]"); if(w){ wer=w.dataset.wer; return zeichnen(); }
-  const p = ev.target.closest(".pill[data-view]"); if(p){ const warArchiv=view==="archiv"; view=p.dataset.view; if(warArchiv!==(view==="archiv")) fMotiv=""; return zeichnen(); }
+  const p = ev.target.closest(".pill[data-view]"); if(p){ const warArchiv=view==="archiv"; view=p.dataset.view; if(warArchiv!==(view==="archiv")){ fMotiv=""; q=""; } return zeichnen(); }
   const tr = ev.target.closest("tr[data-id]"); if(tr){ const it=anfragen.find(a=>a.id===tr.dataset.id); if(it) maske(it); }
   const trl = ev.target.closest("tr[data-locid]"); if(trl){ const it=locations.find(l=>l.id===trl.dataset.locid); if(it) maskeLocation(it); }
 });
