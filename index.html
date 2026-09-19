@@ -703,6 +703,10 @@ function maske(a){
     const le = ev.target.dataset.locedit;
     if(le){
       offen._locPatch[le] = ev.target.value;
+      if(["Ansprechpartner","Telefon","Mail"].includes(le) && !offen.fields[le]){
+        offen.fields[le] = ev.target.value;
+        const zielEl = veil.querySelector('[data-k="'+le+'"]'); if(zielEl) zielEl.value = ev.target.value;
+      }
       const box = $("#kalenderLinkBox");
       if(box && offen.fields.Besichtigungstermin){
         const ortName = (offen._locNeu ? offen._locNeu.Name : (locations.find(x=>x.id===offen._locId)||{}).fields?.Name) || "Location";
