@@ -956,8 +956,8 @@ function absagenUebersichtZeigen(mitMail, ohneMail){
     const mail = a.fields.Mail||l.fields.Mail;
     return '<div data-absageZeile="'+a.id+'" style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--line-2)">'+
       '<div style="flex:1"><b>'+esc(name)+'</b><div class="dim" style="font-size:12.5px">'+esc(mail)+'</div></div>'+
-      '<button type="button" data-absageKopieren="'+a.id+'" class="cta" style="padding:9px 14px;font-size:13px">📋 Text kopieren</button>'+
-      '<a href="'+absageMailtoLink(a)+'" target="_blank" rel="noopener" data-absageEinzeln="'+a.id+'" class="cta quiet" style="text-decoration:none;padding:9px 14px;font-size:13px">✉ Mail öffnen</a>'+
+      '<button type="button" data-absage-kopieren="'+a.id+'" class="cta" style="padding:9px 14px;font-size:13px">📋 Text kopieren</button>'+
+      '<a href="'+absageMailtoLink(a)+'" target="_blank" rel="noopener" data-absage-einzeln="'+a.id+'" class="cta quiet" style="text-decoration:none;padding:9px 14px;font-size:13px">✉ Mail öffnen</a>'+
     '</div>';
   }).join("");
   document.body.insertAdjacentHTML("beforeend",
@@ -973,7 +973,7 @@ function absagenUebersichtZeigen(mitMail, ohneMail){
   };
   v.addEventListener("click", async ev=>{
     if(ev.target.closest("[data-absageZu]")){ v.remove(); await laden(); return; }
-    const kopieren = ev.target.closest("[data-absageKopieren]");
+    const kopieren = ev.target.closest("[data-absage-kopieren]");
     if(kopieren){
       const id = kopieren.dataset.absageKopieren;
       const a = mitMail.find(x=>x.id===id);
@@ -988,7 +988,7 @@ function absagenUebersichtZeigen(mitMail, ohneMail){
       catch(e){ kopieren.textContent = "📋 Text kopieren"; kopieren.insertAdjacentHTML("afterend", '<span class="due tun" style="font-size:12px;display:block;margin-top:4px">Markieren fehlgeschlagen: '+esc(e.message)+'</span>'); }
       return;
     }
-    const einzeln = ev.target.closest("[data-absageEinzeln]");
+    const einzeln = ev.target.closest("[data-absage-einzeln]");
     if(einzeln){
       const id = einzeln.dataset.absageEinzeln;
       einzeln.textContent = "Markiere …";
