@@ -125,6 +125,7 @@ tbody tr:hover td.r{background:var(--card-2)}
     <button class="cta quiet" id="btnCsv">Als CSV laden</button>
     <button class="cta quiet" id="btnExportMarkiert">Übergabe-CSV für Aufnahmeleiter (<span id="exportZahl">0</span>)</button>
     <button class="cta quiet" id="btnExportPDF">📄 PDF-Exposé erstellen</button>
+    <button class="cta quiet" id="btnAbsagen">✉️ Absagen verschicken (<span id="absagenZahl">0</span>)</button>
     <button class="cta quiet" id="btnSync">Aktualisieren</button>
     <button class="cta" id="btnNeuLoc" disabled>+ Location anlegen</button>
     <button class="cta" id="btnNeu" disabled>+ Anfrage anlegen</button>
@@ -461,6 +462,7 @@ function zeichnen(){
   document.querySelectorAll(".pill[data-view]").forEach(b=>b.setAttribute("aria-pressed", b.dataset.view===view));
   $("#btnCsv").textContent = view==="archiv" ? "Archiv als CSV laden" : "Anfragen als CSV laden";
   $("#exportZahl").textContent = anfragen.filter(a=>a.fields.Status==="Gebucht" && !a.fields["An Aufnahmeleiter gesendet"]).length;
+  $("#absagenZahl").textContent = anfragen.filter(a=>a.fields.Status==="Absage" && !a.fields["Absage verschickt am"]).length;
 
   const b = $("#body");
   if(view==="tun") b.innerHTML = tun.length ? tafel(tun,true) : '<div class="board"><div class="blank">Nichts fällig.<br>Entweder ist alles nachgefasst — oder es fehlen noch Anfragen.</div></div>';
@@ -520,17 +522,18 @@ function tafel(list, mitMotiv){
             ? '<a href="https://drive.google.com/drive/folders/'+ordnerId2+'" target="_blank" rel="noopener" title="Fotos ansehen" style="width:52px;height:52px;border-radius:7px;background:var(--card-2);border:1px solid var(--line-2);display:flex;align-items:center;justify-content:center;color:var(--neon);text-decoration:none;font-size:20px">📁</a>'
             : '<div style="width:52px;height:52px;border-radius:7px;border:1px dashed var(--line-2)"></div>');
       const rm = a.fields["Rückmeldung Motivgeber"]||"Offen", rg = a.fields["Entscheidung Regie"]||"Offen";
+      const rmLabel = rm==="Absage"?"Kein Interesse":rm;
       const rmTon = rm==="Interesse"?"gut":rm==="Absage"?"aus":"lauf";
       const rgTon = rg==="Freigegeben"?"gut":rg==="Abgelehnt"?"aus":"lauf";
       return '<tr data-id="'+a.id+'">'+
         '<td>'+fotoZelle+'</td>'+
         '<td><div class="name"><div class="stripe '+s.ton+'"></div><div><b>'+esc(l.fields.Name||a.fields.Titel||"ohne Namen")+'</b>'+
         '<span>'+esc(mitMotiv?(a.fields["Motiv (Drehbuch)"]||""):"")+(l.fields.Website?(mitMotiv?' · ':'')+'<a href="'+esc(l.fields.Website)+'" target="_blank" style="color:var(--txt-2)">Website</a>':'')+'</span></div></div></td>'+
-        '<td><span class="badge '+s.ton+'">'+s.label+'</span></td>'+
+        '<td><span class="badge '+s.ton+'">'+s.label+'</span>'+(a.fields.Status==="Absage" && !a.fields["Absage verschickt am"]?' <span class="due tun" style="font-size:11px">✉ noch offen</span>':'')+'</td>'+
         '<td>'+(l.fields.Adresse?esc(l.fields.Adresse.split("\\n")[0]):'<span class="dim">—</span>')+'</td>'+
         '<td>'+[a.fields.Ansprechpartner,a.fields.Telefon||l.fields.Telefon,a.fields.Mail||l.fields.Mail].filter(Boolean).map(esc).join("<br>")+'</td>'+
         '<td><div style="display:flex;flex-direction:column;gap:5px">'+
-          '<div style="display:flex;align-items:center"><span style="display:inline-block;width:38px;flex:none;font-size:10px;color:var(--txt-3)">MG</span><span class="badge '+rmTon+'">'+rm+'</span></div>'+
+          '<div style="display:flex;align-items:center"><span style="display:inline-block;width:38px;flex:none;font-size:10px;color:var(--txt-3)">MG</span><span class="badge '+rmTon+'">'+rmLabel+'</span></div>'+
           '<div style="display:flex;align-items:center"><span style="display:inline-block;width:38px;flex:none;font-size:10px;color:var(--txt-3)">Regie</span><span class="badge '+rgTon+'">'+rg+'</span></div>'+
         '</div></td>'+
         '<td>'+(a.fields.Wiedervorlage?(fael?'<span class="due tun">seit '+dt(a.fields.Wiedervorlage)+'</span>':dt(a.fields.Wiedervorlage)):(zuTunGrund(a)?'<span class="due '+zuTunTon(zuTunGrund(a))+'" style="font-size:12px">'+zuTunGrund(a)+'</span>':'<span class="dim">—</span>'))+'</td>'+
@@ -579,9 +582,13 @@ function maske(a){
         f("besichtigt","BESICHTIGT AM")+'<input type="date" data-k="Besichtigt am" value="'+esc(a.fields["Besichtigt am"]||"")+'"><div class="tip">Selbst setzen, sobald ihr die Location tatsächlich besichtigt habt — unabhängig vom geplanten Termin oben.</div></div>'+
       '</div></div>'+
       f("preis","MIETE / PREIS"," wide")+'<textarea data-k="Preis" rows="3" placeholder="z.B.&#10;Drehtag: 5.000 netto&#10;Aufbautag: 2.500 netto&#10;Abbautag: 2.500 netto">'+esc(a.fields.Preis||"")+'</textarea></div>'+
-      f("rueckmeldung","RÜCKMELDUNG MOTIVGEBER")+'<select data-k="Rückmeldung Motivgeber">'+["Offen","Interesse","Absage"].map(v=>'<option'+(a.fields["Rückmeldung Motivgeber"]===v?" selected":"")+'>'+v+'</option>').join("")+'</select></div>'+
+      f("rueckmeldung","RÜCKMELDUNG MOTIVGEBER")+'<select data-k="Rückmeldung Motivgeber">'+[["Offen","Offen"],["Interesse","Interesse"],["Absage","Kein Interesse"]].map(([v,lab])=>'<option value="'+v+'"'+(a.fields["Rückmeldung Motivgeber"]===v?" selected":"")+'>'+lab+'</option>').join("")+'</select></div>'+
       f("regie","ENTSCHEIDUNG REGIE")+'<select data-k="Entscheidung Regie">'+["Offen","Freigegeben","Abgelehnt"].map(v=>'<option'+(a.fields["Entscheidung Regie"]===v?" selected":"")+'>'+v+'</option>').join("")+'</select></div>'+
       f("gesendet","AN AUFNAHMELEITER GESENDET")+'<input type="date" data-k="An Aufnahmeleiter gesendet" value="'+esc(a.fields["An Aufnahmeleiter gesendet"]||"")+'"><div class="tip">Selbst setzen, sobald diese Anfrage tatsächlich verschickt wurde — taucht danach nicht mehr im Export auf.</div></div>'+
+      '<div class="fld wide" id="absageBlock"'+(a.fields.Status==="Absage"?"":" hidden")+'><div class="grid">'+
+        f("absagegrund","ABSAGEGRUND (INTERN)"," wide")+'<textarea data-k="Absagegrund" rows="2" placeholder="z.B. anderes Motiv gewählt, Preis zu hoch — nur intern, geht nicht in die Absage-Mail">'+esc(a.fields.Absagegrund||"")+'</textarea></div>'+
+        f("absageverschickt","ABSAGE VERSCHICKT AM")+'<input type="date" data-k="Absage verschickt am" value="'+esc(a.fields["Absage verschickt am"]||"")+'"><div class="tip">Wird automatisch gesetzt, sobald die Absage-Mail über „Absagen verschicken" erzeugt wurde — oder hier selbst setzen.</div></div>'+
+      '</div></div>'+
       f("notiz","WAS WURDE GESAGT"," wide")+'<textarea data-k="Notiz" rows="4">'+esc(a.fields.Notiz||"")+'</textarea></div>'+
     '</div>'+
     '<div class="acts">'+(neu?"":'<button class="kill" data-kill>Löschen</button><button type="button" class="cta quiet" data-expose>📄 Exposé</button>')+'<div class="sp"></div><button class="cta quiet" data-x>Abbrechen</button><button class="cta" data-save>'+(neu?"Anlegen":"Sichern")+'</button></div>'+
@@ -689,6 +696,7 @@ function maske(a){
         if(offen.fields.Status==="Angefragt" && !offen.fields["Angefragt am"]) offen.fields["Angefragt am"]=heute();
         veil.querySelector('[data-k="Angefragt am"]').value = offen.fields["Angefragt am"]||"";
         veil.querySelector('[data-k="Wiedervorlage"]').value = offen.fields.Wiedervorlage||"";
+        $("#absageBlock").hidden = offen.fields.Status!=="Absage";
       }
       if(k==="Besichtigungstermin" || k==="Besichtigungszeit"){
         const box = $("#kalenderLinkBox");
@@ -890,6 +898,37 @@ function exportAufnahmeleiter(){
   const link=document.createElement("a"); link.href=URL.createObjectURL(blob); link.download="expose-aufnahmeleiter_"+heute()+".csv"; link.click();
   warn("");
 }
+function absageKandidaten(){
+  return anfragen.filter(a=>a.fields.Status==="Absage" && !a.fields["Absage verschickt am"]);
+}
+function absageMailtoLink(a){
+  const l = locOf(a)||{fields:{}};
+  const mail = a.fields.Mail||l.fields.Mail;
+  const name = a.fields.Ansprechpartner||l.fields.Ansprechpartner||"";
+  const anrede = name ? "Sehr geehrte/r "+name+"," : "Sehr geehrte Damen und Herren,";
+  const motiv = l.fields.Name||a.fields.Titel||"Ihrer Location";
+  const projekt = a.fields.Projekt || "unsere Produktion";
+  const subject = "Rückmeldung zu "+motiv;
+  const body = anrede+"\n\n"+
+    "vielen Dank für Ihre Zeit und Offenheit rund um "+motiv+" als mögliches Motiv für "+projekt+".\n\n"+
+    "Nach Abstimmung mit der Regie haben wir uns letztlich für ein anderes Motiv entschieden. Das ändert nichts daran, wie sehr wir Ihre Unterstützung zu schätzen wissen — vielen Dank, dass Sie sich die Zeit genommen haben.\n\n"+
+    "Vielleicht ergibt sich bei einem künftigen Projekt wieder eine Gelegenheit.\n\n"+
+    "Herzliche Grüße\nStefan Lincke & Romy Gawlik\nLEX NELSON mediapool";
+  return "mailto:"+mail+"?subject="+encodeURIComponent(subject)+"&body="+encodeURIComponent(body);
+}
+async function absagenVerschicken(){
+  const kandidaten = absageKandidaten();
+  if(!kandidaten.length){ warn('Keine offenen Absagen — alle sind schon als verschickt markiert.'); return; }
+  const mitMail = kandidaten.filter(a=>{ const l=locOf(a)||{fields:{}}; return !!(a.fields.Mail||l.fields.Mail); });
+  const ohneMail = kandidaten.length - mitMail.length;
+  if(!mitMail.length){ warn('Keine der offenen Absagen hat eine hinterlegte Mail-Adresse — bitte erst Kontakt ergänzen.'); return; }
+  mitMail.forEach((a,i)=> setTimeout(()=>window.open(absageMailtoLink(a), "_blank"), i*400));
+  try{
+    await api(TBL_ANF, {method:"PATCH", body: JSON.stringify({records: mitMail.map(a=>({id:a.id, fields:{"Absage verschickt am": heute()}})), typecast:true})});
+    await laden();
+    meldeGut(mitMail.length+' Absage-Entwurf/Entwürfe geöffnet und als verschickt markiert.'+(ohneMail?' '+ohneMail+' übersprungen (keine Mail hinterlegt).':''));
+  }catch(e){ warn('Als verschickt markieren fehlgeschlagen: '+e.message); }
+}
 function exposeStyleBlock(){
   return '@page{margin:0}'+
     ':root{--bg:#f5f4ee;--ink:#1a1a1b;--dim:#8a897f;--lime:#c8e83a;--oliveA:#5c6349;--oliveB:#1c1e16;--line:#e2e0d5;--graybox:#eeede6}'+
@@ -1044,6 +1083,7 @@ document.addEventListener("click", ev=>{
 $("#btnNeu").onclick = () => wer && maske(leerAnfrage());
 $("#btnFilter").onclick = filterMaske;
 $("#btnExportMarkiert").onclick = exportAufnahmeleiter;
+$("#btnAbsagen").onclick = absagenVerschicken;
 $("#btnExportPDF").onclick = exportExposePDF;
 $("#btnNeuLoc").onclick = () => wer && maskeLocation({fields:{}});
 $("#btnSync").onclick = () => {
