@@ -462,7 +462,7 @@ function zeichnen(){
   document.querySelectorAll(".pill[data-view]").forEach(b=>b.setAttribute("aria-pressed", b.dataset.view===view));
   $("#btnCsv").textContent = view==="archiv" ? "Archiv als CSV laden" : "Anfragen als CSV laden";
   $("#exportZahl").textContent = anfragen.filter(a=>a.fields.Status==="Gebucht" && !a.fields["An Aufnahmeleiter gesendet"]).length;
-  $("#absagenZahl").textContent = anfragen.filter(a=>a.fields.Status==="Absage" && !a.fields["Absage verschickt am"]).length;
+  $("#absagenZahl").textContent = absageKandidaten().length;
 
   const b = $("#body");
   if(view==="tun") b.innerHTML = tun.length ? tafel(tun,true) : '<div class="board"><div class="blank">Nichts fällig.<br>Entweder ist alles nachgefasst — oder es fehlen noch Anfragen.</div></div>';
@@ -529,8 +529,8 @@ function tafel(list, mitMotiv){
         '<td>'+fotoZelle+'</td>'+
         '<td><div class="name"><div class="stripe '+s.ton+'"></div><div><b>'+esc(l.fields.Name||a.fields.Titel||"ohne Namen")+'</b>'+
         '<span>'+esc(mitMotiv?(a.fields["Motiv (Drehbuch)"]||""):"")+(l.fields.Website?(mitMotiv?' · ':'')+'<a href="'+esc(l.fields.Website)+'" target="_blank" style="color:var(--txt-2)">Website</a>':'')+'</span></div></div></td>'+
-        '<td><span class="badge '+s.ton+'">'+s.label+'</span>'+(a.fields.Status==="Absage" && !a.fields["Absage verschickt am"]?' <span class="due tun" style="font-size:11px">✉ noch offen</span>':'')+'</td>'+
-        '<td>'+(l.fields.Adresse?esc(l.fields.Adresse.split("\\n")[0]):'<span class="dim">—</span>')+'</td>'+
+        '<td><span class="badge '+s.ton+'">'+s.label+'</span>'+(a.fields.Status==="Absage" && !a.fields["Absage verschickt am"]?' <span class="due tun" style="font-size:11px">Absage-Mail steht noch aus</span>':'')+'</td>'+
+        '<td>'+(l.fields.Adresse?esc(l.fields.Adresse.split("\\n")[0]):'<span class="dim">—</span>')+(l.fields.Bezirk?'<br><span style="font-size:11.5px;color:var(--txt-3)">'+esc(l.fields.Bezirk)+'</span>':'')+'</td>'+
         '<td>'+[a.fields.Ansprechpartner,a.fields.Telefon||l.fields.Telefon,a.fields.Mail||l.fields.Mail].filter(Boolean).map(esc).join("<br>")+'</td>'+
         '<td><div style="display:flex;flex-direction:column;gap:5px">'+
           '<div style="display:flex;align-items:center"><span style="display:inline-block;width:38px;flex:none;font-size:10px;color:var(--txt-3)">MG</span><span class="badge '+rmTon+'">'+rmLabel+'</span></div>'+
@@ -585,10 +585,6 @@ function maske(a){
       f("rueckmeldung","RÜCKMELDUNG MOTIVGEBER")+'<select data-k="Rückmeldung Motivgeber">'+[["Offen","Offen"],["Interesse","Interesse"],["Absage","Kein Interesse"]].map(([v,lab])=>'<option value="'+v+'"'+(a.fields["Rückmeldung Motivgeber"]===v?" selected":"")+'>'+lab+'</option>').join("")+'</select></div>'+
       f("regie","ENTSCHEIDUNG REGIE")+'<select data-k="Entscheidung Regie">'+["Offen","Freigegeben","Abgelehnt"].map(v=>'<option'+(a.fields["Entscheidung Regie"]===v?" selected":"")+'>'+v+'</option>').join("")+'</select></div>'+
       f("gesendet","AN AUFNAHMELEITER GESENDET")+'<input type="date" data-k="An Aufnahmeleiter gesendet" value="'+esc(a.fields["An Aufnahmeleiter gesendet"]||"")+'"><div class="tip">Selbst setzen, sobald diese Anfrage tatsächlich verschickt wurde — taucht danach nicht mehr im Export auf.</div></div>'+
-      '<div class="fld wide" id="absageBlock"'+(a.fields.Status==="Absage"?"":" hidden")+'><div class="grid">'+
-        f("absagegrund","ABSAGEGRUND (INTERN)"," wide")+'<textarea data-k="Absagegrund" rows="2" placeholder="z.B. anderes Motiv gewählt, Preis zu hoch — nur intern, geht nicht in die Absage-Mail">'+esc(a.fields.Absagegrund||"")+'</textarea></div>'+
-        f("absageverschickt","ABSAGE VERSCHICKT AM")+'<input type="date" data-k="Absage verschickt am" value="'+esc(a.fields["Absage verschickt am"]||"")+'"><div class="tip">Wird automatisch gesetzt, sobald die Absage-Mail über „Absagen verschicken" erzeugt wurde — oder hier selbst setzen.</div></div>'+
-      '</div></div>'+
       f("notiz","WAS WURDE GESAGT"," wide")+'<textarea data-k="Notiz" rows="4">'+esc(a.fields.Notiz||"")+'</textarea></div>'+
     '</div>'+
     '<div class="acts">'+(neu?"":'<button class="kill" data-kill>Löschen</button><button type="button" class="cta quiet" data-expose>📄 Exposé</button>')+'<div class="sp"></div><button class="cta quiet" data-x>Abbrechen</button><button class="cta" data-save>'+(neu?"Anlegen":"Sichern")+'</button></div>'+
@@ -696,7 +692,6 @@ function maske(a){
         if(offen.fields.Status==="Angefragt" && !offen.fields["Angefragt am"]) offen.fields["Angefragt am"]=heute();
         veil.querySelector('[data-k="Angefragt am"]').value = offen.fields["Angefragt am"]||"";
         veil.querySelector('[data-k="Wiedervorlage"]').value = offen.fields.Wiedervorlage||"";
-        $("#absageBlock").hidden = offen.fields.Status!=="Absage";
       }
       if(k==="Besichtigungstermin" || k==="Besichtigungszeit"){
         const box = $("#kalenderLinkBox");
@@ -898,6 +893,22 @@ function exportAufnahmeleiter(){
   const link=document.createElement("a"); link.href=URL.createObjectURL(blob); link.download="expose-aufnahmeleiter_"+heute()+".csv"; link.click();
   warn("");
 }
+let absageFeldBereit = false;
+async function absageFeldSicherstellen(){
+  if(absageFeldBereit) return true;
+  try{
+    const r = await fetch("https://api.airtable.com/v0/meta/bases/"+BASE+"/tables/"+TBL_ANF+"/fields", {
+      method:"POST",
+      headers:{Authorization:"Bearer "+TOKEN, "Content-Type":"application/json"},
+      body: JSON.stringify({name:"Absage verschickt am", type:"date", options:{dateFormat:{name:"local"}}})
+    });
+    if(r.ok){ absageFeldBereit = true; return true; }
+    const data = await r.json().catch(()=>({}));
+    const msg = (data && data.error && data.error.message) || "";
+    if(r.status===422 && /already exists|DUPLICATE/i.test(msg+JSON.stringify(data))){ absageFeldBereit = true; return true; }
+    throw new Error(msg || r.statusText);
+  }catch(e){ throw e; }
+}
 function absageKandidaten(){
   return anfragen.filter(a=>a.fields.Status==="Absage" && !a.fields["Absage verschickt am"]);
 }
@@ -922,12 +933,18 @@ async function absagenVerschicken(){
   const mitMail = kandidaten.filter(a=>{ const l=locOf(a)||{fields:{}}; return !!(a.fields.Mail||l.fields.Mail); });
   const ohneMail = kandidaten.length - mitMail.length;
   if(!mitMail.length){ warn('Keine der offenen Absagen hat eine hinterlegte Mail-Adresse — bitte erst Kontakt ergänzen.'); return; }
+  try{
+    await absageFeldSicherstellen();
+  }catch(e){
+    warn('Konnte das Feld "Absage verschickt am" nicht automatisch in Airtable anlegen ('+e.message+'). Der Airtable-Token braucht dafür einmalig die Berechtigung "schema.bases:write" — in den Token-Einstellungen auf airtable.com nachtragen, danach nochmal versuchen.');
+    return;
+  }
   mitMail.forEach((a,i)=> setTimeout(()=>window.open(absageMailtoLink(a), "_blank"), i*400));
   try{
     await api(TBL_ANF, {method:"PATCH", body: JSON.stringify({records: mitMail.map(a=>({id:a.id, fields:{"Absage verschickt am": heute()}})), typecast:true})});
     await laden();
-    meldeGut(mitMail.length+' Absage-Entwurf/Entwürfe geöffnet und als verschickt markiert.'+(ohneMail?' '+ohneMail+' übersprungen (keine Mail hinterlegt).':''));
-  }catch(e){ warn('Als verschickt markieren fehlgeschlagen: '+e.message); }
+    meldeGut(mitMail.length+' Absage-Entwurf/Entwürfe geöffnet und in Airtable als verschickt markiert.'+(ohneMail?' '+ohneMail+' übersprungen (keine Mail hinterlegt).':''));
+  }catch(e){ warn('Mails geöffnet, aber als verschickt markieren fehlgeschlagen: '+e.message); }
 }
 function exposeStyleBlock(){
   return '@page{margin:0}'+
@@ -973,7 +990,7 @@ function exposeStyleBlock(){
 function exposeSeiteHtml(a){
   const l = locOf(a)||{fields:{}};
   const foto = driveThumb(l.fields["Titelfoto (Drive-Link)"],900);
-  const adresse = (l.fields.Adresse||"").split("\n").filter(Boolean).join("<br>");
+  const adresse = (l.fields.Adresse||"").split("\n").filter(Boolean).join("<br>") + (l.fields.Bezirk?'<br><span style="color:var(--dim)">'+esc(l.fields.Bezirk)+'</span>':"");
   const kontaktName = a.fields.Ansprechpartner||l.fields.Ansprechpartner||"";
   const kontaktZeile = [a.fields.Telefon||l.fields.Telefon, a.fields.Mail||l.fields.Mail].filter(Boolean).join(" | ");
   const preisZeilen = (a.fields.Preis||"").split("\n").filter(Boolean);
