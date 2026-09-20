@@ -586,6 +586,7 @@ function maske(a){
       f("rueckmeldung","RÜCKMELDUNG MOTIVGEBER")+'<select data-k="Rückmeldung Motivgeber">'+[["Offen","Offen"],["Interesse","Interesse"],["Absage","Kein Interesse"]].map(([v,lab])=>'<option value="'+v+'"'+(a.fields["Rückmeldung Motivgeber"]===v?" selected":"")+'>'+lab+'</option>').join("")+'</select></div>'+
       f("regie","ENTSCHEIDUNG REGIE")+'<select data-k="Entscheidung Regie">'+["Offen","Freigegeben","Abgelehnt"].map(v=>'<option'+(a.fields["Entscheidung Regie"]===v?" selected":"")+'>'+v+'</option>').join("")+'</select></div>'+
       f("gesendet","AN AUFNAHMELEITER GESENDET")+'<input type="date" data-k="An Aufnahmeleiter gesendet" value="'+esc(a.fields["An Aufnahmeleiter gesendet"]||"")+'"><div class="tip">Selbst setzen, sobald diese Anfrage tatsächlich verschickt wurde — taucht danach nicht mehr im Export auf.</div></div>'+
+      '<div class="fld" id="absageDatumFeld"'+(a.fields.Status==="Absage"?"":" hidden")+'><label>ABSAGE VERSCHICKT AM</label><input type="date" data-k="Absage verschickt am" value="'+esc(a.fields["Absage verschickt am"]||"")+'"><div class="tip">Wird beim Klick auf „Absagen verschicken" automatisch gesetzt. Feld leeren, um die Anfrage zurück auf „noch offen" zu setzen.</div></div>'+
       f("notiz","WAS WURDE GESAGT"," wide")+'<textarea data-k="Notiz" rows="4">'+esc(a.fields.Notiz||"")+'</textarea></div>'+
     '</div>'+
     '<div class="acts">'+(neu?"":'<button class="kill" data-kill>Löschen</button><button type="button" class="cta quiet" data-expose>📄 Exposé</button>')+'<div class="sp"></div><button class="cta quiet" data-x>Abbrechen</button><button class="cta" data-save>'+(neu?"Anlegen":"Sichern")+'</button></div>'+
@@ -693,6 +694,7 @@ function maske(a){
         if(offen.fields.Status==="Angefragt" && !offen.fields["Angefragt am"]) offen.fields["Angefragt am"]=heute();
         veil.querySelector('[data-k="Angefragt am"]').value = offen.fields["Angefragt am"]||"";
         veil.querySelector('[data-k="Wiedervorlage"]').value = offen.fields.Wiedervorlage||"";
+        $("#absageDatumFeld").hidden = offen.fields.Status!=="Absage";
       }
       if(k==="Besichtigungstermin" || k==="Besichtigungszeit"){
         const box = $("#kalenderLinkBox");
