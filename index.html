@@ -953,28 +953,31 @@ function absagenUebersichtZeigen(mitMail, ohneMail){
   const zeilen = mitMail.map(a=>{
     const l = locOf(a)||{fields:{}};
     const name = l.fields.Name||a.fields.Titel||"ohne Namen";
-    return '<div style="display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--line-2)">'+
+    return '<div data-absageZeile="'+a.id+'" style="display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--line-2)">'+
       '<div style="flex:1"><b>'+esc(name)+'</b><div class="dim" style="font-size:12.5px">'+esc(a.fields.Mail||l.fields.Mail)+'</div></div>'+
-      '<a href="'+absageMailtoLink(a)+'" class="cta quiet" style="text-decoration:none;padding:9px 16px;font-size:13px">✉ Mail öffnen</a>'+
+      '<a href="'+absageMailtoLink(a)+'" data-absageEinzeln="'+a.id+'" class="cta quiet" style="text-decoration:none;padding:9px 16px;font-size:13px">✉ Mail öffnen</a>'+
     '</div>';
   }).join("");
   document.body.insertAdjacentHTML("beforeend",
     '<div class="veil" id="absageVeil"><div class="sheet" style="max-width:560px">'+
       '<div class="sheeth"><h2>Absagen einzeln öffnen</h2><button class="shut" data-absageZu>×</button></div>'+
-      '<div class="tip" style="margin-bottom:10px">Auf jeden Link klicken, öffnet den fertigen Entwurf direkt in deinem Mail-Programm. Erst wenn alle raus sind, unten bestätigen.'+(ohneMail?' ('+ohneMail+' Anfrage(n) übersprungen, keine Mail-Adresse hinterlegt.)':'')+'</div>'+
+      '<div class="tip" style="margin-bottom:10px">Klick auf „Mail öffnen" öffnet den Entwurf in deinem Mail-Programm und markiert diese Anfrage direkt als verschickt.'+(ohneMail?' ('+ohneMail+' Anfrage(n) übersprungen, keine Mail-Adresse hinterlegt.)':'')+'</div>'+
       zeilen+
-      '<div class="acts"><div class="sp"></div><button type="button" class="cta quiet" data-absageZu>Später</button><button type="button" class="cta" data-absageFertig>Alle verschickt — als erledigt markieren</button></div>'+
+      '<div class="acts"><div class="sp"></div><button type="button" class="cta" data-absageZu>Fertig</button></div>'+
     '</div></div>');
   const v = $("#absageVeil");
   v.addEventListener("click", async ev=>{
-    if(ev.target.closest("[data-absageZu]")){ v.remove(); return; }
-    if(ev.target.closest("[data-absageFertig]")){
-      try{
-        await api(TBL_ANF, {method:"PATCH", body: JSON.stringify({records: mitMail.map(a=>({id:a.id, fields:{"Absage verschickt am": heute()}})), typecast:true})});
-        v.remove();
-        await laden();
-        meldeGut(mitMail.length+' Absage(n) als verschickt markiert.');
-      }catch(e){ warn('Als verschickt markieren fehlgeschlagen: '+e.message); }
+    if(ev.target.closest("[data-absageZu]")){ v.remove(); await laden(); return; }
+    const einzeln = ev.target.closest("[data-absageEinzeln]");
+    if(einzeln){
+      const id = einzeln.dataset.absageEinzeln;
+      const zeile = v.querySelector('[data-absageZeile="'+id+'"]');
+      setTimeout(async ()=>{
+        einzeln.outerHTML = '<span class="badge gut" style="flex:none">✓ verschickt</span>';
+        try{
+          await api(TBL_ANF, {method:"PATCH", body: JSON.stringify({records:[{id, fields:{"Absage verschickt am": heute()}}], typecast:true})});
+        }catch(e){ if(zeile) zeile.insertAdjacentHTML("beforeend", '<span class="due tun" style="font-size:12px">Markieren fehlgeschlagen: '+esc(e.message)+'</span>'); }
+      }, 0);
     }
   });
 }
