@@ -940,7 +940,13 @@ async function absagenVerschicken(){
     warn('Konnte das Feld "Absage verschickt am" nicht automatisch in Airtable anlegen ('+e.message+'). Der Airtable-Token braucht dafür einmalig die Berechtigung "schema.bases:write" — in den Token-Einstellungen auf airtable.com nachtragen, danach nochmal versuchen.');
     return;
   }
-  mitMail.forEach((a,i)=> setTimeout(()=>window.open(absageMailtoLink(a), "_blank"), i*400));
+  mitMail.forEach((a,i)=> setTimeout(()=>{
+    const link = document.createElement("a");
+    link.href = absageMailtoLink(a);
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+  }, i*400));
   try{
     await api(TBL_ANF, {method:"PATCH", body: JSON.stringify({records: mitMail.map(a=>({id:a.id, fields:{"Absage verschickt am": heute()}})), typecast:true})});
     await laden();
