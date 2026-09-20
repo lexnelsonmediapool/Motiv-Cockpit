@@ -175,7 +175,8 @@ const STATUS = [
   {id:"Besichtigung",label:"Besichtigung",ton:"besicht",hint:"Termin steht oder war"},
   {id:"Möglich",label:"Möglich",ton:"gut",hint:"Zusage da, Preis bekannt"},
   {id:"Gebucht",label:"Ausgesucht",ton:"neon",hint:"ausgesucht — bereit für den Aufnahmeleiter"},
-  {id:"Absage",label:"Absage",ton:"aus",hint:"erledigt"}];
+  {id:"Absage",label:"Abgesagt",ton:"aus",hint:"wir haben abgesagt — erledigt"},
+  {id:"AbsageMotivgeber",label:"Abgelehnt",ton:"aus",hint:"die/der Motivgeber hat uns abgesagt — erledigt"}];
 const KANAL = ["Mail","Telefon","BBFC","Vor Ort","Über Kontakt"];
 
 let locations = [], anfragen = [], wer = "", view = "tun", q = "", fMotiv = "", offen = null, stand = "";
@@ -373,7 +374,7 @@ async function laden(still){
 }
 
 function zuTunGrund(a){
-  if(["Gebucht","Absage"].includes(a.fields.Status)) return null;
+  if(["Gebucht","Absage","AbsageMotivgeber"].includes(a.fields.Status)) return null;
   if(a.fields.Status==="Recherchiert") return "Noch nicht angefragt";
   if(a.fields.Status==="Angefragt" && !a.fields.Wiedervorlage) return "Angefragt, aber ohne Wiedervorlage";
   if(a.fields.Wiedervorlage && a.fields.Wiedervorlage<=heute()) return "Wiedervorlage fällig";
@@ -513,7 +514,7 @@ function tafel(list, mitMotiv){
     list.map(a=>{
       const l = locOf(a) || {fields:{}};
       const s = st(a.fields.Status);
-      const fael = a.fields.Wiedervorlage && a.fields.Wiedervorlage<=heute() && !["Gebucht","Absage"].includes(a.fields.Status);
+      const fael = a.fields.Wiedervorlage && a.fields.Wiedervorlage<=heute() && !["Gebucht","Absage","AbsageMotivgeber"].includes(a.fields.Status);
       const foto = driveThumb(l.fields["Titelfoto (Drive-Link)"],72);
       const ordnerId2 = driveOrdnerId(l.fields["Fotos (Drive-Link)"]);
       const fotoZelle = foto
