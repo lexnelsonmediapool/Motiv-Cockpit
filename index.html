@@ -586,7 +586,7 @@ function maske(a){
       f("rueckmeldung","RÜCKMELDUNG MOTIVGEBER")+'<select data-k="Rückmeldung Motivgeber">'+[["Offen","Offen"],["Interesse","Interesse"],["Absage","Kein Interesse"]].map(([v,lab])=>'<option value="'+v+'"'+(a.fields["Rückmeldung Motivgeber"]===v?" selected":"")+'>'+lab+'</option>').join("")+'</select></div>'+
       f("regie","ENTSCHEIDUNG REGIE")+'<select data-k="Entscheidung Regie">'+["Offen","Freigegeben","Abgelehnt"].map(v=>'<option'+(a.fields["Entscheidung Regie"]===v?" selected":"")+'>'+v+'</option>').join("")+'</select></div>'+
       f("gesendet","AN AUFNAHMELEITER GESENDET")+'<input type="date" data-k="An Aufnahmeleiter gesendet" value="'+esc(a.fields["An Aufnahmeleiter gesendet"]||"")+'"><div class="tip">Selbst setzen, sobald diese Anfrage tatsächlich verschickt wurde — taucht danach nicht mehr im Export auf.</div></div>'+
-      '<div class="fld" id="absageDatumFeld"'+(a.fields.Status==="Absage"?"":" hidden")+'><label>ABSAGE VERSCHICKT AM</label><input type="date" data-k="Absage verschickt am" value="'+esc(a.fields["Absage verschickt am"]||"")+'"><div class="tip">Wird beim Klick auf „Absagen verschicken" automatisch gesetzt. Feld leeren, um die Anfrage zurück auf „noch offen" zu setzen.</div></div>'+
+      '<div class="fld" id="absageDatumFeld"'+(a.fields.Status==="Absage"?"":" hidden")+'><label>ABSAGE VERSCHICKT AM</label><div style="display:flex;gap:8px;align-items:center"><input type="date" data-k="Absage verschickt am" value="'+esc(a.fields["Absage verschickt am"]||"")+'" style="flex:1"><button type="button" class="cta quiet" data-absageDatumLoeschen style="padding:8px 14px;font-size:12.5px">Leeren</button></div><div class="tip">Wird beim Klick auf „Absagen verschicken" automatisch gesetzt. „Leeren" setzt die Anfrage zurück auf „noch offen".</div></div>'+
       f("notiz","WAS WURDE GESAGT"," wide")+'<textarea data-k="Notiz" rows="4">'+esc(a.fields.Notiz||"")+'</textarea></div>'+
     '</div>'+
     '<div class="acts">'+(neu?"":'<button class="kill" data-kill>Löschen</button><button type="button" class="cta quiet" data-expose>📄 Exposé</button>')+'<div class="sp"></div><button class="cta quiet" data-x>Abbrechen</button><button class="cta" data-save>'+(neu?"Anlegen":"Sichern")+'</button></div>'+
@@ -681,6 +681,11 @@ function maske(a){
     if(neu){ offen._locNeu={Name:neu.dataset.neu, Motiv:""}; offen._locId=null; $("#locResult").innerHTML=""; $("#locSuche").value=""; $("#locSucheWrap").hidden=true; locBlockZeichnen(); return; }
     if(ev.target.closest("[data-locClear]")){ offen._locId=null; offen._locNeu=null; $("#locSucheWrap").hidden=false; $("#locSuche").value=""; $("#locSuche").focus(); locBlockZeichnen(); return; }
     if(ev.target.closest("[data-stammdatenAuf]")){ offen._stammdatenOffen = true; locBlockZeichnen(); return; }
+    if(ev.target.closest("[data-absageDatumLoeschen]")){
+      offen.fields["Absage verschickt am"] = "";
+      veil.querySelector('[data-k="Absage verschickt am"]').value = "";
+      return;
+    }
   });
   function eingabeHandler(ev){
     const k = ev.target.dataset.k;
@@ -942,13 +947,13 @@ async function absagenVerschicken(){
     warn('Konnte das Feld "Absage verschickt am" nicht automatisch in Airtable anlegen ('+e.message+'). Der Airtable-Token braucht dafür einmalig die Berechtigung "schema.bases:write" — in den Token-Einstellungen auf airtable.com nachtragen, danach nochmal versuchen.');
     return;
   }
-  mitMail.forEach((a,i)=> setTimeout(()=>{
+  mitMail.forEach(a=>{
     const link = document.createElement("a");
     link.href = absageMailtoLink(a);
     document.body.appendChild(link);
     link.click();
     link.remove();
-  }, i*400));
+  });
   try{
     await api(TBL_ANF, {method:"PATCH", body: JSON.stringify({records: mitMail.map(a=>({id:a.id, fields:{"Absage verschickt am": heute()}})), typecast:true})});
     await laden();
