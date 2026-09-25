@@ -189,11 +189,20 @@ let locations = [], anfragen = [], wer = "", view = "tun", q = "", fMotiv = "", 
 let fEtage = "", fQmMin = "", fQmMax = "", fBezirk = "", fProjekt = "";
 
 const $ = s => document.querySelector(s);
-function driveThumb(url, size){
+function driveFileId(url){
   if(!url) return null;
   const m = String(url).match(/[-\w]{25,}/);
-  if(!m) return null;
-  return "https://drive.google.com/thumbnail?id="+m[0]+"&sz=w"+(size||160);
+  return m ? m[0] : null;
+}
+function driveThumb(url, size){
+  const id = driveFileId(url);
+  if(!id) return null;
+  return "https://lh3.googleusercontent.com/d/"+id+"=w"+(size||160);
+}
+function driveThumbAlt(url, size){
+  const id = driveFileId(url);
+  if(!id) return null;
+  return "https://drive.google.com/thumbnail?id="+id+"&sz=w"+(size||160);
 }
 function alleSpezMotive(){
   const s = new Set(aktiveMotivliste());
@@ -522,9 +531,10 @@ function tafel(list, mitMotiv){
       const s = st(a.fields.Status);
       const fael = a.fields.Wiedervorlage && a.fields.Wiedervorlage<=heute() && !["Gebucht","Motiv","Absage","AbsageMotivgeber"].includes(a.fields.Status);
       const foto = driveThumb(l.fields["Titelfoto (Drive-Link)"],72);
+      const fotoAlt = driveThumbAlt(l.fields["Titelfoto (Drive-Link)"],72);
       const ordnerId2 = driveOrdnerId(l.fields["Fotos (Drive-Link)"]);
       const fotoZelle = foto
-        ? '<img src="'+foto+'" onerror="this.outerHTML=\'<div style=&quot;width:52px;height:52px;border-radius:7px;border:1px solid var(--line-2);display:flex;align-items:center;justify-content:center;font-size:8px;color:var(--txt-3);text-align:center;padding:2px&quot;>Foto nicht freigegeben</div>\'" style="width:52px;height:52px;object-fit:cover;border-radius:7px;border:1px solid var(--line-2)">'
+        ? '<img src="'+foto+'" data-alt="'+fotoAlt+'" onerror="if(!this.dataset.altTried){this.dataset.altTried=1;this.src=this.dataset.alt;}else{this.outerHTML=\'<div style=&quot;width:52px;height:52px;border-radius:7px;border:1px solid var(--line-2);display:flex;align-items:center;justify-content:center;font-size:8px;color:var(--txt-3);text-align:center;padding:2px&quot;>Foto nicht freigegeben</div>\'}" style="width:52px;height:52px;object-fit:cover;border-radius:7px;border:1px solid var(--line-2)">'
         : (ordnerId2
             ? '<a href="https://drive.google.com/drive/folders/'+ordnerId2+'" target="_blank" rel="noopener" title="Fotos ansehen" style="width:52px;height:52px;border-radius:7px;background:var(--card-2);border:1px solid var(--line-2);display:flex;align-items:center;justify-content:center;color:var(--neon);text-decoration:none;font-size:20px">📁</a>'
             : '<div style="width:52px;height:52px;border-radius:7px;border:1px dashed var(--line-2)"></div>');
@@ -636,9 +646,10 @@ function maske(a){
             '<button type="button" class="cta quiet" data-stammdatenAuf style="margin-top:8px;padding:8px 16px;font-size:12.5px">Stammdaten bearbeiten</button>';
         }
         const t = driveThumb(ex.fields["Titelfoto (Drive-Link)"],320);
+        const tAlt = driveThumbAlt(ex.fields["Titelfoto (Drive-Link)"],320);
         const ordId = driveOrdnerId(ex.fields["Fotos (Drive-Link)"]);
         let inhalt;
-        if(t) inhalt = '<img src="'+t+'" onerror="this.outerHTML=\'<div class=&quot;tip&quot;>Titelfoto lädt nicht — im Archiv prüfen, ob es extra freigegeben ist.</div>\'" style="max-height:220px;border-radius:9px;border:1px solid var(--line-2)">';
+        if(t) inhalt = '<img src="'+t+'" data-alt="'+tAlt+'" onerror="if(!this.dataset.altTried){this.dataset.altTried=1;this.src=this.dataset.alt;}else{this.outerHTML=\'<div class=&quot;tip&quot;>Titelfoto lädt nicht — im Archiv prüfen, ob es extra freigegeben ist.</div>\'}" style="max-height:220px;border-radius:9px;border:1px solid var(--line-2)">';
         else if(ordId) inhalt = '<a href="https://drive.google.com/drive/folders/'+ordId+'" target="_blank" rel="noopener" class="mini" style="text-decoration:none;display:inline-block">📁 Fotos dieser Location ansehen ↗</a>';
         else inhalt = '<div class="tip">Weder Titelfoto noch Fotoordner bei dieser Location hinterlegt.</div>';
         b.innerHTML += '<div class="fld wide" style="margin-top:10px">'+inhalt+'</div>';
@@ -794,7 +805,7 @@ function maskeLocation(l){
       '<div class="fld wide" id="galerieLoc">'+driveGalerie(flds["Fotos (Drive-Link)"])+'</div>'+
       f("notiz","NOTIZ"," wide")+'<textarea data-lk="Notiz" rows="3">'+esc(flds.Notiz||"")+'</textarea></div>'+
       f("titelfoto","TITELFOTO"," wide")+'<input data-lk="Titelfoto (Drive-Link)" value="'+esc(flds["Titelfoto (Drive-Link)"]||"")+'" placeholder="Link von einem einzelnen Foto"></div>'+
-      '<div class="fld wide" id="titelfotoVorschau">'+(driveThumb(flds["Titelfoto (Drive-Link)"],120)?'<img src="'+driveThumb(flds["Titelfoto (Drive-Link)"],120)+'" onerror="this.outerHTML=\'<div class=&quot;tip&quot;>Lädt nicht — dieses Foto in Drive öffnen, Rechtsklick, Freigeben, extra auf &quot;Jeder mit dem Link&quot; stellen. Nicht nur der Ordner, dieses eine Foto.</div>\'" style="height:80px;border-radius:8px;border:1px solid var(--line-2)">':'<div class="tip">Wichtig: Nicht den Ordner-Link, sondern von einem einzelnen Foto. Und: dieses Foto muss zusätzlich extra auf „Jeder mit dem Link" freigegeben sein — der offene Ordner allein reicht nicht.</div>')+'</div>'+
+      '<div class="fld wide" id="titelfotoVorschau">'+(driveThumb(flds["Titelfoto (Drive-Link)"],120)?'<img src="'+driveThumb(flds["Titelfoto (Drive-Link)"],120)+'" data-alt="'+driveThumbAlt(flds["Titelfoto (Drive-Link)"],120)+'" onerror="if(!this.dataset.altTried){this.dataset.altTried=1;this.src=this.dataset.alt;}else{this.outerHTML=\'<div class=&quot;tip&quot;>Lädt nicht — dieses Foto in Drive öffnen, Rechtsklick, Freigeben, extra auf &quot;Jeder mit dem Link&quot; stellen. Nicht nur der Ordner, dieses eine Foto.</div>\'}" style="height:80px;border-radius:8px;border:1px solid var(--line-2)">':'<div class="tip">Wichtig: Nicht den Ordner-Link, sondern von einem einzelnen Foto. Und: dieses Foto muss zusätzlich extra auf „Jeder mit dem Link" freigegeben sein — der offene Ordner allein reicht nicht.</div>')+'</div>'+
     '</div>'+
     (neu ? "" : historieHtml(l.id)) +
     '<div class="acts">'+(neu?"":'<button class="kill" data-lkill>Löschen</button>')+'<div class="sp"></div><button class="cta quiet" data-lx>Abbrechen</button><button class="cta" data-lsave>'+(neu?"In der Datenbank anlegen":"Sichern")+'</button></div>'+
@@ -807,8 +818,9 @@ function maskeLocation(l){
     if(k==="Fotos (Drive-Link)") $("#galerieLoc").innerHTML = driveGalerie(ev.target.value);
     if(k==="Titelfoto (Drive-Link)"){
       const t = driveThumb(ev.target.value,120);
+      const tAlt = driveThumbAlt(ev.target.value,120);
       $("#titelfotoVorschau").innerHTML = t
-        ? '<img src="'+t+'" onerror="this.outerHTML=\'<div class=&quot;tip&quot;>Lädt nicht — dieses Foto extra auf &quot;Jeder mit dem Link&quot; freigeben, nicht nur den Ordner.</div>\'" style="height:80px;border-radius:8px;border:1px solid var(--line-2)">'
+        ? '<img src="'+t+'" data-alt="'+tAlt+'" onerror="if(!this.dataset.altTried){this.dataset.altTried=1;this.src=this.dataset.alt;}else{this.outerHTML=\'<div class=&quot;tip&quot;>Lädt nicht — dieses Foto extra auf &quot;Jeder mit dem Link&quot; freigeben, nicht nur den Ordner.</div>\'}" style="height:80px;border-radius:8px;border:1px solid var(--line-2)">'
         : '<div class="tip">Wichtig: Dieses Foto muss zusätzlich extra freigegeben sein.</div>';
     }
   });
@@ -1047,6 +1059,7 @@ function exposeStyleBlock(){
 function exposeSeiteHtml(a){
   const l = locOf(a)||{fields:{}};
   const foto = driveThumb(l.fields["Titelfoto (Drive-Link)"],900);
+  const fotoAlt = driveThumbAlt(l.fields["Titelfoto (Drive-Link)"],900);
   const adresse = (l.fields.Adresse||"").split("\n").filter(Boolean).join("<br>") + (l.fields.Bezirk?'<br><span style="color:var(--dim)">'+esc(l.fields.Bezirk)+'</span>':"");
   const kontaktName = a.fields.Ansprechpartner||l.fields.Ansprechpartner||"";
   const kontaktZeile = [a.fields.Telefon||l.fields.Telefon, a.fields.Mail||l.fields.Mail].filter(Boolean).join(" | ");
@@ -1060,7 +1073,7 @@ function exposeSeiteHtml(a){
     '</div>'+
     '<div class="lab">Name</div><h1>'+esc(l.fields.Name||"Ohne Namen")+'</h1>'+
     '<div class="lab">Motiv</div><div class="motivWert">'+esc(a.fields["Motiv (Drehbuch)"]||l.fields.Motiv||"—")+'</div>'+
-    (foto ? '<img class="grafik" src="'+foto+'" alt="">' : '<div class="grafikLeer"></div>')+
+    (foto ? '<img class="grafik" src="'+foto+'" data-alt="'+fotoAlt+'" onerror="if(!this.dataset.altTried){this.dataset.altTried=1;this.src=this.dataset.alt;}" alt="">' : '<div class="grafikLeer"></div>')+
     '<div class="grafikBalken"></div>'+
     '<div class="reihe">'+
       '<div><div class="lab">Adresse</div><div class="wert">'+(adresse||"—")+'</div></div>'+
