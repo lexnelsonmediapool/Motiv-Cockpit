@@ -1185,7 +1185,23 @@ $("#fProjekt").onchange = e => { fProjekt=e.target.value; zeichnen(); };
 
 zeichnen();
 laden();
-setInterval(()=>{ if(!offen) laden(true); }, 20000);
+// Automatisches Nachladen: deutlich seltener (statt alle 20s) und nur,
+// solange der Tab aktiv sichtbar ist — spart Airtable-API-Calls, die sich
+// bei offenem Tab sonst über den Tag massiv summieren (Grund für das
+// erreichte API-Limit im Free-Plan).
+let pollTimer = null;
+function pollStarten(){
+  if(pollTimer) return;
+  pollTimer = setInterval(()=>{ if(!offen) laden(true); }, 180000); // alle 3 Minuten
+}
+function pollStoppen(){
+  if(pollTimer){ clearInterval(pollTimer); pollTimer = null; }
+}
+document.addEventListener("visibilitychange", ()=>{
+  if(document.hidden) pollStoppen();
+  else { laden(true); pollStarten(); } // beim Zurückkommen einmal sofort auffrischen
+});
+if(!document.hidden) pollStarten();
 </script>
 </body>
 </html>
