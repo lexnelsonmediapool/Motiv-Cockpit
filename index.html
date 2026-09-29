@@ -137,7 +137,8 @@ tbody tr:hover td.r{background:var(--card-2)}
   <div class="kpis" id="kpis"></div>
   <div class="pills">
     <button class="pill" data-view="tun">Zu tun</button>
-    <button class="pill" data-view="motive">Nach Motiv</button>
+    <button class="pill" data-view="ausgewaehlt">✓ Motiv gefunden</button>
+    <button class="pill" data-view="motive">Fortschritt je Motiv</button>
     <button class="pill" data-view="alle">Alle Anfragen</button>
     <div class="pillDiv"></div>
     <button class="pill arch" data-view="archiv">🗄 Archiv (alle Locations)</button>
@@ -483,6 +484,10 @@ function zeichnen(){
   const b = $("#body");
   if(view==="tun") b.innerHTML = tun.length ? tafel(tun,true) : '<div class="board"><div class="blank">Nichts fällig.<br>Entweder ist alles nachgefasst — oder es fehlen noch Anfragen.</div></div>';
   else if(view==="alle") b.innerHTML = sicht.length ? tafel(sicht,true) : '<div class="board"><div class="blank">Noch keine Anfragen. Leg oben die erste an.</div></div>';
+  else if(view==="ausgewaehlt"){
+    const ausgewaehlt = sicht.filter(a=>a.fields.Status==="Motiv");
+    b.innerHTML = ausgewaehlt.length ? tafel(ausgewaehlt,true) : '<div class="board"><div class="blank">Noch keine Anfrage als „Motiv" (final) markiert.</div></div>';
+  }
   else if(view==="archiv"){
     const ls = sichtbarLocations();
     b.innerHTML = ls.length ? tafelLocations(ls) : '<div class="board"><div class="blank">Noch keine Locations im Archiv. Leg oben eine an.</div></div>';
