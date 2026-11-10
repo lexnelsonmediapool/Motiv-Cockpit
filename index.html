@@ -166,6 +166,7 @@ const API = "https://api.airtable.com/v0/" + BASE + "/";
 let PROJEKT_MOTIVE = {};
 const STANDARD_PROJEKT_FALLBACK = "Heiland VI";
 let STANDARD_PROJEKT = STANDARD_PROJEKT_FALLBACK;
+let standardAngewendet = false; // Projekt mit Haken "Standard im Cockpit" wird beim ersten Laden automatisch ausgewählt
 const MOTIVE_FALLBACK = ["Show Außengelände","Aufenthaltsraum","Schnittraum","Präsentationsraum","Schule",
   "Plattenbauwohnung","Krankenhaus","Büro Staatsanwältin Kraus","Restaurant Pileckis",
   "Wohnung Linda","Wohnung Marion","Nagelstudio","Verpackungsbetrieb","Sonstiges"];
@@ -373,16 +374,20 @@ async function laden(still){
     const [l,a,p] = await Promise.all([alle(TBL_LOC), alle(TBL_ANF), alle(TBL_PROJ)]);
     locations = l; anfragen = a;
     const neuePM = {};
+    let standardAusAirtable = "";
     p.forEach(rec=>{
       const name = rec.fields.Name;
       const liste = (rec.fields.Pflichtmotive||"").split("\n").map(s=>s.trim()).filter(Boolean);
       if(name && liste.length) neuePM[name] = liste;
+      if(name && rec.fields["Standard im Cockpit"]) standardAusAirtable = name;
     });
     if(Object.keys(neuePM).length){
       PROJEKT_MOTIVE = neuePM;
-      MOTIVE = PROJEKT_MOTIVE[STANDARD_PROJEKT_FALLBACK] || PROJEKT_MOTIVE[Object.keys(PROJEKT_MOTIVE)[0]] || MOTIVE_FALLBACK;
-      STANDARD_PROJEKT = PROJEKT_MOTIVE[STANDARD_PROJEKT_FALLBACK] ? STANDARD_PROJEKT_FALLBACK : Object.keys(PROJEKT_MOTIVE)[0];
+      if(standardAusAirtable && PROJEKT_MOTIVE[standardAusAirtable]) STANDARD_PROJEKT = standardAusAirtable;
+      else STANDARD_PROJEKT = PROJEKT_MOTIVE[STANDARD_PROJEKT_FALLBACK] ? STANDARD_PROJEKT_FALLBACK : Object.keys(PROJEKT_MOTIVE)[0];
+      MOTIVE = PROJEKT_MOTIVE[STANDARD_PROJEKT] || MOTIVE_FALLBACK;
     }
+    if(!standardAngewendet && standardAusAirtable){ fProjekt = standardAusAirtable; standardAngewendet = true; }
     stand = new Date().toLocaleTimeString("de-DE",{hour:"2-digit",minute:"2-digit"});
     if(!still){ warn(""); meldeGut("Aktualisiert um "+stand+" — "+l.length+" Locations, "+a.length+" Anfragen geladen."); }
   }catch(e){ warn("Airtable antwortet gerade nicht (" + e.message + "). Zuletzt geladener Stand bleibt sichtbar."); }
@@ -565,7 +570,7 @@ function tafel(list, mitMotiv){
     }).join("")+'</tbody></table></div>';
 }
 
-function leerAnfrage(){ return {id:null,fields:{Status:"Recherchiert",Von:wer}}; }
+function leerAnfrage(){ return {id:null,fields:{Status:"Recherchiert",Von:wer,Projekt:(fProjekt||STANDARD_PROJEKT||"")}}; }
 
 function maske(a){
   offen = JSON.parse(JSON.stringify(a));
@@ -587,7 +592,7 @@ function maske(a){
     '<div class="secTitle">Anfrage</div>'+
     '<div class="grid">'+
       f("status","STATUS")+'<select data-k="Status" id="selStatus">'+STATUS.map(s=>'<option value="'+s.id+'"'+(a.fields.Status===s.id?" selected":"")+'>'+s.label+'</option>').join("")+'</select><div class="tip" id="tipStatus">'+st(a.fields.Status||"Recherchiert").hint+'</div></div>'+
-      f("projekt","PROJEKT")+'<input data-k="Projekt" list="projektListe" value="'+esc(a.fields.Projekt||"")+'" placeholder="Heiland VI"></div>'+
+      f("projekt","PROJEKT")+'<input data-k="Projekt" list="projektListe" value="'+esc(a.fields.Projekt||"")+'" placeholder="z. B. Heiland VI - Block 2"></div>'+
       f("motivdb","MOTIV (DREHBUCH)")+'<input data-k="Motiv (Drehbuch)" list="motivDbListe" value="'+esc(a.fields["Motiv (Drehbuch)"]||"")+'" placeholder="z.B. Wohnung Linda"></div>'+
       '<datalist id="motivDbListe">'+alleSpezMotive().map(m=>'<option value="'+esc(m)+'">').join("")+'</datalist>'+
       '<datalist id="projektListe">'+alleProjekte().map(p=>'<option value="'+esc(p)+'">').join("")+'</datalist>'+
