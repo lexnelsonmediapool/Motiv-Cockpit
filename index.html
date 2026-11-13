@@ -156,12 +156,18 @@ tbody tr:hover td.r{background:var(--card-2)}
 
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <script>
-const TOKEN = "patRjGhLKlkaJXOmU.bc33eb2db87b567a6aa1a7ff591aeafb226a498f930d31097ce32441ac6d4f5b";
+const WORKER = "https://lexnelson-galerie.lexnelson.workers.dev";
+function holeKey(){
+  let k = ""; try{ k = localStorage.getItem("cockpitKey") || ""; }catch(e){}
+  if(!k){ k = (prompt("Passwort für das Motiv Cockpit:") || "").trim(); if(k){ try{ localStorage.setItem("cockpitKey", k); }catch(e){} } }
+  return k;
+}
+function keyVergessen(){ try{ localStorage.removeItem("cockpitKey"); }catch(e){} }
 const BASE = "appkllF2qSGRuxYt1";
 const TBL_LOC = "tblNzlozaIyBXNO8p";
 const TBL_ANF = "tblAf3hMsbyq9lc0V";
 const TBL_PROJ = "Projekte";
-const API = "https://api.airtable.com/v0/" + BASE + "/";
+const API = WORKER + "/at/" + BASE + "/";
 
 let PROJEKT_MOTIVE = {};
 const STANDARD_PROJEKT_FALLBACK = "Heiland VI";
@@ -356,7 +362,8 @@ function warnIn(id, t){
 }
 
 async function api(path, opts){
-  const r = await fetch(API+path, Object.assign({headers:{Authorization:"Bearer "+TOKEN,"Content-Type":"application/json"}}, opts||{}));
+  const r = await fetch(API+path, Object.assign({headers:{"X-Key":holeKey(),"Content-Type":"application/json"}}, opts||{}));
+  if(r.status===401){ keyVergessen(); throw new Error("Passwort falsch – bitte Seite neu laden und erneut eingeben"); }
   if(!r.ok){ const t = await r.text(); throw new Error(r.status+": "+t.slice(0,160)); }
   return r.json();
 }
@@ -840,8 +847,8 @@ function maskeLocation(l){
       const haengt = anfragen.filter(a=>(a.fields.Location||[])[0]===l.id);
       if(haengt.length && !confirm(haengt.length+" Anfrage(n) hängen an dieser Location und werden mitgelöscht. Wirklich löschen?")) return;
       try{
-        if(haengt.length) await fetch(API+TBL_ANF+"?"+haengt.map(a=>"records[]="+a.id).join("&"), {method:"DELETE", headers:{Authorization:"Bearer "+TOKEN}});
-        const r = await fetch(API+TBL_LOC+"?records[]="+l.id, {method:"DELETE", headers:{Authorization:"Bearer "+TOKEN}});
+        if(haengt.length) await fetch(API+TBL_ANF+"?"+haengt.map(a=>"records[]="+a.id).join("&"), {method:"DELETE", headers:{"X-Key":holeKey()}});
+        const r = await fetch(API+TBL_LOC+"?records[]="+l.id, {method:"DELETE", headers:{"X-Key":holeKey()}});
         if(!r.ok) throw new Error(await r.text());
         await laden(); warn(""); veil.remove();
       }catch(e){ warnIn("veilAlertLoc","Löschen fehlgeschlagen: "+e.message); }
@@ -905,7 +912,7 @@ async function sichern(){
 }
 async function loeschen(a){
   try{
-    const r = await fetch(API+TBL_ANF+"?records[]="+a.id, {method:"DELETE", headers:{Authorization:"Bearer "+TOKEN}});
+    const r = await fetch(API+TBL_ANF+"?records[]="+a.id, {method:"DELETE", headers:{"X-Key":holeKey()}});
     if(!r.ok) throw new Error(await r.text());
     await laden(); return true;
   }catch(e){ warnIn("veilAlert","Löschen fehlgeschlagen: "+e.message); return false; }
@@ -933,9 +940,9 @@ let absageFeldBereit = false;
 async function absageFeldSicherstellen(){
   if(absageFeldBereit) return true;
   try{
-    const r = await fetch("https://api.airtable.com/v0/meta/bases/"+BASE+"/tables/"+TBL_ANF+"/fields", {
+    const r = await fetch(WORKER+"/at/meta/bases/"+BASE+"/tables/"+TBL_ANF+"/fields", {
       method:"POST",
-      headers:{Authorization:"Bearer "+TOKEN, "Content-Type":"application/json"},
+      headers:{"X-Key":holeKey(), "Content-Type":"application/json"},
       body: JSON.stringify({name:"Absage verschickt am", type:"date", options:{dateFormat:{name:"local"}}})
     });
     if(r.ok){ absageFeldBereit = true; return true; }
