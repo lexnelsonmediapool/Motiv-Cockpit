@@ -194,7 +194,7 @@ const STATUS = [
 const KANAL = ["Mail","Telefon","BBFC","Vor Ort","Über Kontakt"];
 
 let locations = [], anfragen = [], wer = "", view = "tun", q = "", fMotiv = "", offen = null, stand = "";
-let fEtage = "", fQmMin = "", fQmMax = "", fBezirk = "", fProjekt = "";
+let fEtage = "", fQmMin = "", fQmMax = "", fBezirk = "", fProjekt = "", fStatus = "";
 
 const $ = s => document.querySelector(s);
 function driveFileId(url){
@@ -427,6 +427,7 @@ function sichtbar(){
     if(fProjekt && (a.fields.Projekt||"") !== fProjekt) return false;
     if(fEtage && l.fields.Etage !== fEtage) return false;
     if(fBezirk && l.fields.Bezirk !== fBezirk) return false;
+    if(fStatus && a.fields.Status !== fStatus) return false;
     if(fQmMin && !(Number(l.fields.qm)>=Number(fQmMin))) return false;
     if(fQmMax && !(Number(l.fields.qm)<=Number(fQmMax))) return false;
     if(!q) return true;
@@ -486,7 +487,7 @@ function zeichnen(){
   $("#fProjekt").style.display = view==="archiv" ? "none" : "inline-block";
   $("#fProjekt").innerHTML = '<option value="">Alle Projekte</option>'+projekte.map(p=>'<option'+(fProjekt===p?' selected':'')+'>'+esc(p)+'</option>').join("");
   $("#suche").value = q;
-  const filterAktiv = fEtage||fQmMin||fQmMax||fBezirk||q;
+  const filterAktiv = fEtage||fQmMin||fQmMax||fBezirk||fStatus||q;
   $("#filterBadge").style.display = filterAktiv ? "flex" : "none";
   document.querySelectorAll(".pill[data-view]").forEach(b=>b.setAttribute("aria-pressed", b.dataset.view===view));
   $("#btnCsv").textContent = view==="archiv" ? "Archiv als CSV laden" : "Anfragen als CSV laden";
@@ -1159,6 +1160,7 @@ function filterMaske(){
       '<div class="fld"><label>ETAGE</label><select id="filEtage"><option value="">Alle</option>'+ETAGEN.map(e=>'<option'+(fEtage===e?" selected":"")+'>'+e+'</option>').join("")+'</select></div>'+
       '<div class="fld"><label>QM VON</label><input id="filQmMin" type="number" value="'+esc(fQmMin)+'" placeholder="z.B. 60"></div>'+
       '<div class="fld"><label>QM BIS</label><input id="filQmMax" type="number" value="'+esc(fQmMax)+'" placeholder="z.B. 100"></div>'+
+      '<div class="fld"><label>STATUS</label><select id="filStatus"><option value="">Alle</option>'+STATUS.map(x=>'<option value="'+x.id+'"'+(fStatus===x.id?" selected":"")+'>'+x.label+'</option>').join("")+'</select></div>'+
       '<div class="fld"><label>BEZIRK</label><select id="filBezirk"><option value="">Alle</option>'+BEZIRKE.map(b=>'<option'+(fBezirk===b?" selected":"")+'>'+b+'</option>').join("")+'</select></div>'+
     '</div>'+
     '<div class="acts"><button class="cta quiet" id="filReset">Zurücksetzen</button><div class="sp"></div><button class="cta quiet" data-fx>Abbrechen</button><button class="cta" id="filApply">Anwenden</button></div>'+
@@ -1167,7 +1169,7 @@ function filterMaske(){
   v.addEventListener("click", ev=>{
     if(ev.target===v || ev.target.closest("[data-fx]")) return v.remove();
     if(ev.target.closest("#filReset")){
-      fEtage=""; fQmMin=""; fQmMax=""; fBezirk="";
+      fEtage=""; fQmMin=""; fQmMax=""; fBezirk=""; fStatus="";
       v.remove(); zeichnen(); return;
     }
     if(ev.target.closest("#filApply")){
@@ -1175,6 +1177,7 @@ function filterMaske(){
       fQmMin = $("#filQmMin").value;
       fQmMax = $("#filQmMax").value;
       fBezirk = $("#filBezirk").value;
+      fStatus = $("#filStatus").value;
       v.remove(); zeichnen();
     }
   });
