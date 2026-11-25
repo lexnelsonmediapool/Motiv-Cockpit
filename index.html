@@ -1092,7 +1092,7 @@ function exposeSeiteHtml(a){
       '<div class="kopfRecht"><div class="lab">Motivexpose</div><div class="bar"></div></div>'+
     '</div>'+
     '<div class="lab">Name</div><h1>'+esc(l.fields.Name||"Ohne Namen")+'</h1>'+
-    '<div class="lab">Motiv</div><div class="motivWert">'+esc(a.fields["Motiv (Drehbuch)"]||l.fields.Motiv||"—")+'</div>'+
+    '<div class="lab">Motiv</div><div class="motivWert">'+esc(a.fields["Motiv (Drehbuch)"]||l.fields.Motiv||"—")+(a.fields["Priorität 1-3"]?' <span style="font-weight:700;white-space:nowrap">· Priorität '+esc(a.fields["Priorität 1-3"])+'</span>':'')+'</div>'+
     (foto ? '<img class="grafik" src="'+foto+'" data-alt="'+fotoAlt+'" onerror="if(!this.dataset.altTried){this.dataset.altTried=1;this.src=this.dataset.alt;}" alt="">' : '<div class="grafikLeer"></div>')+
     '<div class="grafikBalken"></div>'+
     '<div class="reihe">'+
