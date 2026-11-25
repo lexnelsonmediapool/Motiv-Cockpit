@@ -1036,8 +1036,8 @@ function absagenUebersichtZeigen(mitMail, ohneMail){
   });
 }
 function exposeStyleBlock(){
-  return '@page{margin:0}'+
-    ':root{--bg:#f5f4ee;--ink:#1a1a1b;--dim:#8a897f;--lime:#c8e83a;--oliveA:#5c6349;--oliveB:#1c1e16;--line:#e2e0d5;--graybox:#eeede6}'+
+  return '@page{size:A4;margin:0}'+'html,body,*{-webkit-print-color-adjust:exact;print-color-adjust:exact}'+
+    ':root{--bg:#f5f4ee;--ink:#1a1a1b;--dim:#66655b;--lime:#c8e83a;--oliveA:#5c6349;--oliveB:#1c1e16;--line:#e2e0d5;--graybox:#eeede6}'+
     '*{box-sizing:border-box}'+
     'body{font-family:ui-sans-serif,-apple-system,Inter,Helvetica,sans-serif;color:var(--ink);margin:0;background:#e9e8e1}'+
     '.seite{width:794px;min-height:1123px;margin:0 auto;background:var(--bg);padding:56px 64px;position:relative;break-after:page;page-break-after:always}'+
@@ -1092,7 +1092,7 @@ function exposeSeiteHtml(a){
       '<div class="kopfRecht"><div class="lab">Motivexpose</div><div class="bar"></div></div>'+
     '</div>'+
     '<div class="lab">Name</div><h1>'+esc(l.fields.Name||"Ohne Namen")+'</h1>'+
-    '<div class="lab">Motiv</div><div class="motivWert">'+esc(a.fields["Motiv (Drehbuch)"]||l.fields.Motiv||"—")+(a.fields["Priorität 1-3"]?' <span style="font-weight:700;white-space:nowrap">· Priorität '+esc(a.fields["Priorität 1-3"])+'</span>':'')+'</div>'+
+    '<div class="lab">Motiv</div><div class="motivWert">'+esc(a.fields["Motiv (Drehbuch)"]||l.fields.Motiv||"—")+(a.fields["Priorität 1-3"]?' <span style="display:inline-block;background:#c8e83a;color:#1a1a1b;border-radius:99px;padding:2px 12px;margin-left:12px;font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;white-space:nowrap;vertical-align:middle">Priorität '+esc(a.fields["Priorität 1-3"])+'</span>':'')+'</div>'+
     (foto ? '<img class="grafik" src="'+foto+'" data-alt="'+fotoAlt+'" onerror="if(!this.dataset.altTried){this.dataset.altTried=1;this.src=this.dataset.alt;}" alt="">' : '<div class="grafikLeer"></div>')+
     '<div class="grafikBalken"></div>'+
     '<div class="reihe">'+
