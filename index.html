@@ -1074,7 +1074,7 @@ function exposeStyleBlock(){
     '.gesagtBox p{font-size:13.5px;line-height:1.6;margin:0;color:#3a3a37}'+
     '.fuss{position:absolute;left:64px;right:64px;bottom:36px;display:flex;justify-content:space-between;'+
       'font-size:10.5px;font-weight:700;letter-spacing:.1em;color:var(--dim);text-transform:uppercase}'+
-    '@media print{body{background:#fff}.seite{box-shadow:none;margin:0}.keindruck{display:none}}';
+    '@media print{body{background:#fff}.seite{box-shadow:none;margin:0;width:210mm;height:296mm;min-height:0;overflow:hidden}.keindruck{display:none}}';
 }
 function exposeSeiteHtml(a){
   const l = locOf(a)||{fields:{}};
