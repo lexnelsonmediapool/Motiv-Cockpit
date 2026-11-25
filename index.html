@@ -618,6 +618,7 @@ function maske(a){
       f("preis","MIETE / PREIS"," wide")+'<textarea data-k="Preis" rows="3" placeholder="z.B.&#10;Drehtag: 5.000 netto&#10;Aufbautag: 2.500 netto&#10;Abbautag: 2.500 netto">'+esc(a.fields.Preis||"")+'</textarea></div>'+
       f("rueckmeldung","RÜCKMELDUNG MOTIVGEBER")+'<select data-k="Rückmeldung Motivgeber">'+[["Offen","Offen"],["Interesse","Interesse"],["Absage","Kein Interesse"]].map(([v,lab])=>'<option value="'+v+'"'+(a.fields["Rückmeldung Motivgeber"]===v?" selected":"")+'>'+lab+'</option>').join("")+'</select></div>'+
       f("regie","ENTSCHEIDUNG REGIE")+'<select data-k="Entscheidung Regie">'+["Offen","Freigegeben","Abgelehnt"].map(v=>'<option'+(a.fields["Entscheidung Regie"]===v?" selected":"")+'>'+v+'</option>').join("")+'</select></div>'+
+      f("prio","PRIORITÄT REGIE (1–3)")+'<select data-k="Priorität 1-3">'+[["","–"],["1","1 (höchste)"],["2","2"],["3","3 (niedrigste)"]].map(([v,lab])=>'<option value="'+v+'"'+((a.fields["Priorität 1-3"]||"")===v?" selected":"")+'>'+lab+'</option>').join("")+'</select><div class="tip">Priorität des Regisseurs für diese Location. Kommt als Spalte „Priorität“ in die Übergabe-CSV für den Aufnahmeleiter.</div></div>'+
       f("gesendet","AN AUFNAHMELEITER GESENDET")+'<input type="date" data-k="An Aufnahmeleiter gesendet" value="'+esc(a.fields["An Aufnahmeleiter gesendet"]||"")+'"><div class="tip">Selbst setzen, sobald diese Anfrage tatsächlich verschickt wurde — taucht danach nicht mehr im Export auf.</div></div>'+
       '<div class="fld" id="absageDatumFeld"'+(a.fields.Status==="Absage"?"":" hidden")+'><label>ABSAGE VERSCHICKT AM</label><div style="display:flex;gap:8px;align-items:center"><input type="date" data-k="Absage verschickt am" value="'+esc(a.fields["Absage verschickt am"]||"")+'" style="flex:1"><button type="button" class="cta quiet" data-absageDatumLoeschen style="padding:8px 14px;font-size:12.5px">Leeren</button></div><div class="tip">Wird beim Klick auf „Absagen verschicken" automatisch gesetzt. „Leeren" setzt die Anfrage zurück auf „noch offen".</div></div>'+
       f("notiz","WAS WURDE GESAGT"," wide")+'<textarea data-k="Notiz" rows="4">'+esc(a.fields.Notiz||"")+'</textarea></div>'+
@@ -889,6 +890,7 @@ async function sichern(){
       locId = created.records[0].id;
     }
     const fields = ohneLookups(Object.assign({}, offen.fields, {Location:[locId], Von: offen.fields.Von||wer}));
+    if(fields["Priorität 1-3"]==="") fields["Priorität 1-3"]=null;
     if(offen.id) await api(TBL_ANF, {method:"PATCH", body: JSON.stringify({records:[{id:offen.id, fields}], typecast:true})});
     else await api(TBL_ANF, {method:"POST", body: JSON.stringify({records:[{fields}], typecast:true})});
     if(!offen._locNeu){
@@ -924,11 +926,11 @@ function exposeKandidaten(){
 function exportAufnahmeleiter(){
   const kandidaten = exposeKandidaten();
   if(!kandidaten.length){ warn('Nichts zu exportieren — alle „Ausgesucht"-Anfragen wurden bereits als gesendet markiert.'); return; }
-  const sp=["Motiv (Drehbuch)","Name","Adresse","Bezirk","Etage","qm","Zimmer","Ansprechpartner","Telefon","Mail","Website","Fotos (Drive-Link)","Preis","Projekt","Notiz"];
+  const sp=["Motiv (Drehbuch)","Priorität","Name","Adresse","Bezirk","Etage","qm","Zimmer","Ansprechpartner","Telefon","Mail","Website","Fotos (Drive-Link)","Preis","Projekt","Notiz"];
   const c=v=>'"'+String(v??"").replace(/"/g,'""').replace(/\n/g," ")+'"';
   const rows = kandidaten.map(a=>{
     const l = locOf(a)||{fields:{}};
-    return [a.fields["Motiv (Drehbuch)"],l.fields.Name,l.fields.Adresse,l.fields.Bezirk,l.fields.Etage,l.fields.qm,l.fields.Zimmer,
+    return [a.fields["Motiv (Drehbuch)"],a.fields["Priorität 1-3"],l.fields.Name,l.fields.Adresse,l.fields.Bezirk,l.fields.Etage,l.fields.qm,l.fields.Zimmer,
       a.fields.Ansprechpartner||l.fields.Ansprechpartner,a.fields.Telefon||l.fields.Telefon,a.fields.Mail||l.fields.Mail,
       l.fields.Website,l.fields["Fotos (Drive-Link)"],a.fields.Preis,a.fields.Projekt,a.fields.Notiz].map(c).join(";");
   });
